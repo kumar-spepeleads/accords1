@@ -1135,11 +1135,11 @@
                 <div class="nav-buttons">
                     <button class="btn btn-green" onclick="showSection('newBill')">📝 New Bill</button>
                     <button class="btn btn-green" onclick="showSection('history')">📊 Bill History</button>
-                    <!-- <button class="btn secondary" onclick="showAdminLogin()">🔑 Admin</button>
-                    <a href="tracking.html">
+                    <button id="adminNavButton" class="btn secondary" onclick="showAdminLogin()" style="display: none;">🔑 Admin</button>
+                    <a href="tracking.html" id="trackUsersLink" style="display: none;">
                         <button class="btn btn-green">Track Users</button>
                     </a>
-                </div> -->
+                </div>
                 
                 <div class="stats">
                     <div class="stat-card">
@@ -1449,19 +1449,35 @@
         }
 
         /**
-         * Loads vouchers from Firestore and sets up a real-time listener.
+         * Performs a one-time fetch of vouchers to ensure data is available on load.
          */
-        function loadVouchersFromFirestore() {
-            const vouchersRef = db.collection('vouchers').orderBy('serialNumber');
-            
-            vouchersRef.onSnapshot(snapshot => {
+        async function initialVoucherLoad() {
+            try {
+                const vouchersRef = db.collection('vouchers').orderBy('serialNumber');
+                const snapshot = await vouchersRef.get();
                 voucherDefinitions = snapshot.docs.map(doc => ({
                     id: doc.id,
                     ...doc.data()
                 }));
-                console.log("Vouchers updated from Firestore:", voucherDefinitions);
-                renderVoucherManagementList(); // Update the management modal list
-                refreshBillLists(); // Redraw bills to update voucher dropdowns
+                console.log("Initial vouchers loaded successfully:", voucherDefinitions);
+            } catch (error) {
+                 console.error("Error performing initial voucher load:", error);
+                 showError('adminPanelMessage', 'Could not load initial voucher data.');
+            }
+        }
+
+        /**
+         * Sets up a real-time listener for subsequent voucher updates.
+         */
+        function setupVoucherListener() {
+            db.collection('vouchers').orderBy('serialNumber').onSnapshot(snapshot => {
+                voucherDefinitions = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                console.log("Vouchers updated via listener:", voucherDefinitions);
+                renderVoucherManagementList();
+                refreshBillLists(); 
             }, error => {
                 console.error("Error fetching vouchers:", error);
                 showError('adminPanelMessage', 'Could not load vouchers.');
@@ -1602,7 +1618,7 @@
             return voucherDefinitions.find(v => v.serialNumber === serialNumber);
         }
 
-        // FIXED: Voucher sequence management
+        // Voucher sequence management
         async function getNextVoucherInSequence() {
             // Load sequence if empty
             if (voucherSequence.length === 0) {
@@ -1622,27 +1638,35 @@
             return voucher;
         }
 
-        // FIXED: Load voucher sequence
+        // Load voucher sequence
         async function loadVoucherSequence() {
             try {
                 const sequenceDoc = await db.collection('appSettings').doc('voucherSequence').get();
-                if (sequenceDoc.exists) {
-                    voucherSequence = sequenceDoc.data().sequence || [];
+                if (sequenceDoc.exists && sequenceDoc.data().sequence && sequenceDoc.data().sequence.length > 0) {
+                    voucherSequence = sequenceDoc.data().sequence;
                     voucherSequenceIndex = sequenceDoc.data().index || 0;
+                    console.log("Loaded existing voucher sequence from Firestore.");
                 } else {
-                    // Initialize sequence with all serial numbers
+                    // Initialize sequence with all serial numbers if not found in Firestore
+                    console.log("No valid sequence in Firestore. Creating new one from sorted voucher definitions.");
+                    // voucherDefinitions should already be sorted by serialNumber from the initial load
                     voucherSequence = voucherDefinitions.map(v => v.serialNumber);
                     voucherSequenceIndex = 0;
-                    await saveVoucherSequence();
+                    if (voucherSequence.length > 0) {
+                       await saveVoucherSequence();
+                       console.log("New voucher sequence saved to Firestore.");
+                    }
                 }
             } catch (error) {
                 console.error("Error loading voucher sequence:", error);
+                // Fallback to locally defined vouchers if Firestore fails
                 voucherSequence = voucherDefinitions.map(v => v.serialNumber);
                 voucherSequenceIndex = 0;
             }
         }
 
-        // FIXED: Save voucher sequence
+
+        // Save voucher sequence
         async function saveVoucherSequence() {
             try {
                 await db.collection('appSettings').doc('voucherSequence').set({
@@ -1894,14 +1918,17 @@
             return contact && /^\+?[0-9]{7,15}$/.test(contact.replace(/\s/g, ''));
         }
 
-        // --- Voucher Toggle Functions (Manual) ---
+        // --- Voucher Toggle Functions (Manual & Auto) ---
         async function getVoucherToggleState() {
             try {
                 const docRef = db.collection('appSettings').doc('global');
                 const docSnap = await docRef.get();
                 if (docSnap.exists) {
-                    return docSnap.data().voucherGenerationEnabled || false;
+                    const isEnabled = docSnap.data().voucherGenerationEnabled || false;
+                    console.log(`%c[DEBUG] Read voucherGenerationEnabled from Firestore: ${isEnabled}`, 'color: blue;');
+                    return isEnabled;
                 }
+                console.log('%c[DEBUG] Voucher settings doc does not exist, returning false.', 'color: orange;');
                 return false;
             } catch (error) {
                 console.error("Error fetching voucher toggle state:", error);
@@ -1910,6 +1937,7 @@
         }
 
         async function setVoucherToggleState(isEnabled, showMessage = true) {
+             console.log(`%c[DEBUG] Setting voucherGenerationEnabled to: ${isEnabled}`, 'color: green;');
              try {
                 await db.collection('appSettings').doc('global').set({ voucherGenerationEnabled: isEnabled }, { merge: true });
                 if (showMessage) {
@@ -1921,7 +1949,6 @@
         }
         
         // --- Bill Sharing Functions ---
-        // UPDATED: sendWhatsAppBill now passes the billDocId to generateBillContent
         async function sendWhatsAppBill(billDocId, customMessage = null) { 
             let billData;
             try {
@@ -1936,7 +1963,6 @@
                 showErrorInModal('billDetailsMessage', 'Failed to retrieve bill.'); return false;
             }
 
-            // FIXED: Pass the billDocId to generate the correct tracking URL
             const messageToSend = customMessage || await generateBillContent(billData, billDocId);
             const contactInfo = billData.customerContactInfo;
             let whatsappSent = false;
@@ -1960,7 +1986,6 @@
             return whatsappSent;
         }
 
-        // UPDATED: prepareInstagramShare now passes the billDocId to generateBillContent
         async function prepareInstagramShare(billDocId) { 
             let billData;
             try {
@@ -1975,7 +2000,6 @@
                 showErrorInModal('billDetailsMessage', 'Failed to retrieve bill.'); return;
             }
 
-            // FIXED: Pass the billDocId to generate the correct tracking URL
             const billContent = await generateBillContent(billData, billDocId); 
             document.getElementById('instagramBillPreview').textContent = billContent;
             document.getElementById('instagramShareMessage').style.display = 'none';
@@ -1988,7 +2012,6 @@
             refreshBillLists();
         }
         
-        // UPDATED: prepareVoucherForInstagramShare now includes billId and description in the URL
         async function prepareVoucherForInstagramShare(billDocId, voucherSerialNumber) { 
              let billData;
             try {
@@ -2008,7 +2031,6 @@
                 showErrorInModal('billDetailsMessage', 'Voucher details not found.'); return;
             }
             
-            // FIXED: Added billId and voucher description to the tracking URL
             const rawTrackingUrl = `https://accords-gamming.web.app/Redirecting.html?url=${encodeURIComponent(voucher.imageUrl)}&name=${encodeURIComponent(billData.customerName)}&phone=${encodeURIComponent(billData.customerContactInfo)}&billId=${billDocId}&desc=${encodeURIComponent(voucher.description)}`;
             const shortUrl = await shortenUrl(rawTrackingUrl);
 
@@ -2054,7 +2076,6 @@
             }
         }
         
-        // UPDATED: sendVoucherWithDiscount now includes billId and description in the URL
         async function sendVoucherWithDiscount(billDocId, voucherSerialNumber) { 
             if (!billDocId) { showErrorInModal('billDetailsMessage', 'Please select a bill.'); return; }
             let billData;
@@ -2073,7 +2094,6 @@
                 return;
             }
             
-            // FIXED: Added billId and voucher description to the tracking URL
             const trackingUrl = `https://accords-gamming.web.app/Redirecting.html?url=${encodeURIComponent(voucher.imageUrl)}&name=${encodeURIComponent(billData.customerName)}&phone=${encodeURIComponent(billData.customerContactInfo)}&billId=${billDocId}&desc=${encodeURIComponent(voucher.description)}`;
             const shortUrl = await shortenUrl(trackingUrl);
 
@@ -2124,27 +2144,33 @@
 
             try {
                 const voucherGenerationEnabled = await getVoucherToggleState();
+                console.log(`%c[DEBUG] Bill creation: voucherGenerationEnabled is ${voucherGenerationEnabled}`, 'color: blue;');
                 let assignedVoucher = null;
                 
                 const billSequentialSerialNumber = await getNextBillSerialNumber();
 
                 if (voucherGenerationEnabled) {
+                    console.log("%c[DEBUG] Voucher generation is ON. Getting next voucher.", 'color: green;');
                     const nextVoucher = await getNextVoucherInSequence();
                     if (nextVoucher) {
+                        console.log(`%c[DEBUG] Assigning voucher: ${nextVoucher.description}`, 'color: green;');
                         assignedVoucher = {
                             serialNumber: nextVoucher.serialNumber,
                             description: nextVoucher.description,
                             imageUrl: nextVoucher.imageUrl
                         };
+                    } else {
+                        console.log("%c[DEBUG] No next voucher available in sequence.", 'color: orange;');
                     }
-                } 
+                } else {
+                    console.log("%c[DEBUG] Voucher generation is OFF. Not assigning a voucher.", 'color: red;');
+                }
 
-                // CORRECTED LOGIC: Create the document first to get the ID
                 const newBillRef = db.collection('bills').doc();
                 const newBillId = newBillRef.id;
 
                 const billData = {
-                    id: newBillId, // Store the ID within the document itself
+                    id: newBillId,
                     serialNumber: billSequentialSerialNumber,
                     publicCode: generatePublicCode(),
                     customerName: document.getElementById('customerName').value,
@@ -2166,7 +2192,6 @@
                     billData.assignedVoucher = assignedVoucher;
                 }
                 
-                // Now, set the data for the document with the known ID
                 await newBillRef.set(billData);
 
                 showSuccess('billSuccess', `Bill (Serial: ${billData.serialNumber}) created! ${assignedVoucher ? `Voucher Assigned: ${assignedVoucher.description}` : ''}`);
@@ -2232,7 +2257,9 @@
         function showPage(page) {
             ['landingPage', 'dashboardPage', 'adminPage'].forEach(p => document.getElementById(p).classList.remove('active'));
             document.getElementById(page + 'Page').classList.add('active'); 
-            if (page === 'dashboard') showSection('newBill');
+            if (page === 'dashboard') {
+                showSection('newBill');
+            }
             if (page === 'admin') {
                 initializeAdminPanel();
             }
@@ -2304,11 +2331,10 @@
         async function loadBillHistory() { 
             if (!currentUser) return;
             const billsList = document.getElementById('billsList');
-            billsList.innerHTML = ''; 
+            billsList.innerHTML = 'Loading bills...'; 
             document.getElementById('noBillsMessage').style.display = 'none';
 
             try {
-                // Fetch bills without ordering from Firestore
                 const billsSnapshot = await db.collection('bills')
                     .where('createdBy', '==', currentUser.uid)
                     .limit(150)
@@ -2316,9 +2342,9 @@
                 
                 let billsData = billsSnapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
                 
-                // Sort the data in JavaScript
                 billsData.sort((a, b) => (b.createdAt?.toDate() || 0) - (a.createdAt?.toDate() || 0));
-
+                
+                billsList.innerHTML = '';
                 if (billsData.length === 0) {
                     document.getElementById('noBillsMessage').style.display = 'block';
                 } else {
@@ -2335,17 +2361,16 @@
         async function loadAdminBillHistory() { 
             if (!currentUser || currentUserRole !== 'admin') return; 
             const adminBillsList = document.getElementById('adminBillsList');
-            adminBillsList.innerHTML = ''; 
+            adminBillsList.innerHTML = 'Loading all bills...'; 
             document.getElementById('noAdminBillsMessage').style.display = 'none';
 
             try {
-                // Fetch all bills without ordering from Firestore
                 const billsSnapshot = await db.collection('bills').get(); 
                 let billsData = billsSnapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
                 
-                // Sort the data in JavaScript
                 billsData.sort((a, b) => (b.createdAt?.toDate() || 0) - (a.createdAt?.toDate() || 0));
 
+                adminBillsList.innerHTML = '';
                 if (billsData.length === 0) {
                     document.getElementById('noAdminBillsMessage').style.display = 'block';
                 } else {
@@ -2365,7 +2390,6 @@
             
             const isAdminOnAdminPage = currentUserRole === 'admin' && document.getElementById('adminPage').classList.contains('active');
             
-            // Use the check to decide the class for the bill item styling
             div.className = isAdminOnAdminPage ? 'admin-bill-item' : 'bill-item';
             
             const timeInDate = new Date(bill.timeIn);
@@ -2392,7 +2416,6 @@
                 else shareStatusHtml = '<p style="color: #6c757d; margin-top: 5px;"><i class="fas fa-info-circle"></i> Not Shared Yet</p>';
             }
 
-            // Dynamically create voucher dropdown content
             let voucherDropdownContent = voucherDefinitions.map(v => {
                 return `
                     <a href="#" onclick="event.preventDefault(); sendVoucherWithDiscount('${billDocId}', ${v.serialNumber});">
@@ -2406,7 +2429,6 @@
 
 
             let actionsHtml = '';
-            // Use the check to determine which buttons to show
             if (isAdminOnAdminPage) {
                 actionsHtml = `
                     <button class="btn" onclick="viewBillDetails('${billDocId}')"><i class="fas fa-eye"></i> View</button>
@@ -2423,7 +2445,6 @@
             } else { 
                 actionsHtml = `
                     <button class="btn" onclick="viewBillDetails('${billDocId}')"><i class="fas fa-eye"></i> View</button>
-                    <button class="btn btn-green" onclick="openAssignVoucherModal('${billDocId}')"><i class="fas fa-gift"></i> Assign Voucher</button>
                     <button class="btn whatsapp" onclick="sendWhatsAppBill('${billDocId}')"><i class="fab fa-whatsapp"></i> WhatsApp</button>
                     <button class="btn instagram" onclick="prepareInstagramShare('${billDocId}')"><i class="fab fa-instagram"></i> Instagram</button>
                 `;
@@ -2530,7 +2551,6 @@
                             <button class="btn whatsapp" onclick="sendBillViaWhatsAppFromModal()"><i class="fab fa-whatsapp"></i> Send Bill (WA)</button>
                             <button class="btn instagram" onclick="prepareInstagramShare(currentBillId)"><i class="fab fa-instagram"></i> Send Bill (IG)</button>
                             <button class="btn manual-share" onclick="markBillAsManuallyShared()"><i class="fas fa-handshake"></i> Manual</button>
-                            <button class="btn btn-green" onclick="openAssignVoucherModal(currentBillId); closeModal('billDetailsModal');"><i class="fas fa-gift"></i> Assign Voucher</button>
                         `;
                     }
 
@@ -2648,21 +2668,32 @@
 
                 if (timeRemaining <= 0) {
                     if (currentState === 'active') {
+                        // Switch from ACTIVE to BREAK
+                        console.log("%c[CYCLE] Active period ended. Switching to Break.", "color: orange");
                         currentState = 'break';
                         timeRemaining = parseInt(document.getElementById('breakDuration').value, 10) * 60;
-                        await setVoucherToggleState(false, false);
-                    } else {
+                        await setVoucherToggleState(false, false); // Vouchers OFF
+                        
+                        const newCycleState = {
+                            cycleState: currentState,
+                            stateChangeTimestamp: firebase.firestore.FieldValue.serverTimestamp()
+                        };
+                        await db.collection('appSettings').doc('global').set(newCycleState, { merge: true });
+
+                    } else { // currentState is 'break'
+                        // Switch from BREAK to ACTIVE (Looping)
+                        console.log("%c[CYCLE] Break period ended. Looping back to Active.", "color: green");
                         currentState = 'active';
                         timeRemaining = parseInt(document.getElementById('activeDuration').value, 10) * 60;
-                        await setVoucherToggleState(true, false);
+                        await setVoucherToggleState(true, false); // Vouchers ON
+                        
+                        const newCycleState = {
+                            cycleState: currentState,
+                            stateChangeTimestamp: firebase.firestore.FieldValue.serverTimestamp()
+                        };
+                        await db.collection('appSettings').doc('global').set(newCycleState, { merge: true });
                     }
-                    
-                    const newCycleState = {
-                        cycleState: currentState,
-                        stateChangeTimestamp: firebase.firestore.FieldValue.serverTimestamp()
-                    };
-                    await db.collection('appSettings').doc('global').set(newCycleState, { merge: true });
-
+                    // Update UI for the new state
                     updateTimerDisplay(timeRemaining, currentState);
                     document.getElementById('voucherToggle').checked = (currentState === 'active');
                 }
@@ -2678,21 +2709,15 @@
             if(saveState) {
                 await db.collection('appSettings').doc('global').set({ cycleState: 'stopped' }, { merge: true });
                 await setVoucherToggleState(false); 
-                showSuccess('adminPanelMessage', 'Voucher cycle stopped.'); // Corrected message for stop cycle
+                showSuccess('adminPanelMessage', 'Voucher cycle stopped.');
             }
         }
 
         async function initializeAdminPanel() {
-            // Setup voucher management
-            await seedInitialVouchers();
-            loadVouchersFromFirestore();
-            await loadVoucherSequence(); // Load voucher sequence
-
             const voucherToggle = document.getElementById('voucherToggle');
             const startBtn = document.getElementById('startCycleBtn');
             const stopBtn = document.getElementById('stopCycleBtn');
             
-            // Re-bind listeners
             voucherToggle.removeEventListener('change', onVoucherToggleChange);
             const newStartBtn = startBtn.cloneNode(true);
             startBtn.parentNode.replaceChild(newStartBtn, startBtn);
@@ -2703,7 +2728,6 @@
             newStartBtn.addEventListener('click', startCycle);
             newStopBtn.addEventListener('click', () => stopCycle(true));
             
-            // Fetch and apply settings from Firestore
             try {
                 const docRef = db.collection('appSettings').doc('global');
                 const docSnap = await docRef.get();
@@ -2726,7 +2750,18 @@
                             runCycle(timeRemaining, settings.cycleState);
                             showSuccess('adminPanelMessage', 'Resumed active voucher cycle.');
                         } else {
-                            stopCycle(true);
+                            // The timer for the last state has expired, so we need to figure out where we are in the continuous loop
+                            const totalCycleDuration = settings.activeDuration + settings.breakDuration;
+                            const timeIntoLoop = elapsedSeconds % totalCycleDuration;
+
+                            if (timeIntoLoop < settings.activeDuration) {
+                                // We are in the 'active' part of the new loop
+                                runCycle(settings.activeDuration - timeIntoLoop, 'active');
+                            } else {
+                                // We are in the 'break' part of the new loop
+                                runCycle(totalCycleDuration - timeIntoLoop, 'break');
+                            }
+                            showSuccess('adminPanelMessage', 'Resumed and re-calculated voucher cycle.');
                         }
                     } else {
                         stopCycle(false);
@@ -2770,6 +2805,25 @@
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
                     }, { merge: true }); 
                 }
+
+                // --- NEW ROLE-BASED UI LOGIC ---
+                const adminNavButton = document.getElementById('adminNavButton');
+                const trackUsersLink = document.getElementById('trackUsersLink');
+
+                if (currentUserRole === 'admin') {
+                    adminNavButton.style.display = 'inline-flex';
+                    trackUsersLink.style.display = 'block';
+                } else { // 'staff' role
+                    adminNavButton.style.display = 'none';
+                    trackUsersLink.style.display = 'none';
+                }
+                // --- END NEW LOGIC ---
+
+                await seedInitialVouchers();
+                await initialVoucherLoad();
+                setupVoucherListener();
+                await loadVoucherSequence();
+
                 initializeTimeInputs();
                 showPage('dashboard');
                 loadStats();
