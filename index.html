@@ -1470,7 +1470,7 @@
          * Sets up a real-time listener for subsequent voucher updates.
          */
         function setupVoucherListener() {
-            db.collection('vouchers').orderBy('serialNumber').onSnapshot(snapshot => {
+            db.collection('vouchers').orderBy('serialNumber').onSnapshot(async snapshot => { // Add async here
                 voucherDefinitions = snapshot.docs.map(doc => ({
                     id: doc.id,
                     ...doc.data()
@@ -1478,6 +1478,11 @@
                 console.log("Vouchers updated via listener:", voucherDefinitions);
                 renderVoucherManagementList();
                 refreshBillLists(); 
+                
+                // --- NEW: Re-evaluate and potentially update voucher sequence on any voucher definition change ---
+                await loadVoucherSequence(); // This will ensure voucherSequence is up-to-date with new/deleted vouchers
+                // --- END NEW ---
+
             }, error => {
                 console.error("Error fetching vouchers:", error);
                 showError('adminPanelMessage', 'Could not load vouchers.');
@@ -1620,8 +1625,8 @@
 
         // Voucher sequence management
         async function getNextVoucherInSequence() {
-            // Load sequence if empty
-            if (voucherSequence.length === 0) {
+            // Load sequence if empty or needs re-sync
+            if (voucherSequence.length === 0 || voucherSequence.length !== voucherDefinitions.length || !voucherSequence.every(sn => voucherDefinitions.some(v => v.serialNumber === sn))) {
                 await loadVoucherSequence();
             }
             
@@ -1638,30 +1643,88 @@
             return voucher;
         }
 
-        // Load voucher sequence
+        /**
+         * Loads the voucher sequence from Firestore and ensures it's synchronized with
+         * the current voucher definitions. If no sequence exists or if it's stale,
+         * it rebuilds and saves a new one.
+         */
         async function loadVoucherSequence() {
             try {
-                const sequenceDoc = await db.collection('appSettings').doc('voucherSequence').get();
+                const sequenceDocRef = db.collection('appSettings').doc('voucherSequence');
+                const sequenceDoc = await sequenceDocRef.get();
+
+                // Get current serial numbers from actively defined vouchers
+                let currentSerialNumbers = voucherDefinitions.map(v => v.serialNumber);
+                currentSerialNumbers.sort((a, b) => a - b); // Ensure a consistent base order
+
+                let updatedSequence = [];
+                let updatedIndex = 0;
+
                 if (sequenceDoc.exists && sequenceDoc.data().sequence && sequenceDoc.data().sequence.length > 0) {
-                    voucherSequence = sequenceDoc.data().sequence;
-                    voucherSequenceIndex = sequenceDoc.data().index || 0;
-                    console.log("Loaded existing voucher sequence from Firestore.");
-                } else {
-                    // Initialize sequence with all serial numbers if not found in Firestore
-                    console.log("No valid sequence in Firestore. Creating new one from sorted voucher definitions.");
-                    // voucherDefinitions should already be sorted by serialNumber from the initial load
-                    voucherSequence = voucherDefinitions.map(v => v.serialNumber);
-                    voucherSequenceIndex = 0;
-                    if (voucherSequence.length > 0) {
-                       await saveVoucherSequence();
-                       console.log("New voucher sequence saved to Firestore.");
+                    let storedSequence = sequenceDoc.data().sequence;
+                    let storedIndex = sequenceDoc.data().index || 0;
+
+                    // Filter out deleted vouchers and ensure unique
+                    let tempSet = new Set();
+                    for (const sn of storedSequence) {
+                        if (currentSerialNumbers.includes(sn)) {
+                            tempSet.add(sn);
+                        }
                     }
+
+                    // Add any new vouchers not in the stored sequence, maintaining the sort
+                    for (const sn of currentSerialNumbers) {
+                        if (!tempSet.has(sn)) {
+                            tempSet.add(sn);
+                        }
+                    }
+                    
+                    // Reconstruct the sequence, sorting to maintain a deterministic order
+                    updatedSequence = Array.from(tempSet).sort((a, b) => a - b);
+                    
+                    // Adjust index if it's out of bounds or points to a deleted item
+                    if (storedIndex >= updatedSequence.length || (updatedSequence.length > 0 && !updatedSequence.includes(storedSequence[storedIndex]))) {
+                        updatedIndex = 0; // Reset index if current one is invalid
+                    } else {
+                        // Attempt to find the new index of the previously selected voucher
+                        const previousSerialNumber = storedSequence[storedIndex];
+                        const newIdx = updatedSequence.indexOf(previousSerialNumber);
+                        if (newIdx !== -1) {
+                            updatedIndex = newIdx;
+                        } else {
+                            updatedIndex = 0; // Fallback if previous one not found in the new sequence
+                        }
+                    }
+
+                    console.log("Voucher sequence adjusted based on current definitions.");
+
+                } else {
+                    // Initialize new sequence from all current vouchers
+                    console.log("No valid sequence in Firestore. Creating new one from sorted voucher definitions.");
+                    updatedSequence = currentSerialNumbers; // Already sorted
+                    updatedIndex = 0;
                 }
+                
+                // Update global variables
+                voucherSequence = updatedSequence;
+                voucherSequenceIndex = updatedIndex;
+
+                // Save the (potentially updated) sequence back to Firestore
+                if (voucherSequence.length > 0) {
+                    await saveVoucherSequence(); // This will use the updated global voucherSequence and Index
+                    console.log("Voucher sequence (re)saved to Firestore.");
+                } else {
+                    // If no vouchers exist, ensure the Firestore document is also cleared or set to empty
+                    await sequenceDocRef.set({ sequence: [], index: 0 }, { merge: true });
+                    console.log("Voucher sequence cleared in Firestore as no vouchers exist.");
+                }
+
             } catch (error) {
-                console.error("Error loading voucher sequence:", error);
-                // Fallback to locally defined vouchers if Firestore fails
-                voucherSequence = voucherDefinitions.map(v => v.serialNumber);
+                console.error("Error loading/initializing voucher sequence:", error);
+                // Fallback to locally defined vouchers serial numbers if Firestore fails
+                voucherSequence = voucherDefinitions.map(v => v.serialNumber).sort((a, b) => a - b);
                 voucherSequenceIndex = 0;
+                console.warn("Fallback to local voucher sequence due to Firestore error.");
             }
         }
 
@@ -2054,11 +2117,8 @@
 
         function copyBillDetailsToClipboard() {
             const billContent = document.getElementById('instagramBillPreview').textContent;
-            navigator.clipboard.writeText(billContent).then(() => {
-                showSuccess('instagramShareMessage', 'Bill details copied to clipboard!');
-            }).catch(err => {
-                showError('instagramShareMessage', 'Failed to copy. Please copy manually.');
-            });
+            document.execCommand('copy'); // Use execCommand for broader iframe compatibility
+            showSuccess('instagramShareMessage', 'Bill details copied to clipboard!');
         }
 
         async function markBillAsManuallyShared() {
@@ -2724,9 +2784,9 @@
             const newStopBtn = stopBtn.cloneNode(true);
             stopBtn.parentNode.replaceChild(newStopBtn, stopBtn);
 
-            voucherToggle.addEventListener('change', onVoucherToggleChange);
             newStartBtn.addEventListener('click', startCycle);
             newStopBtn.addEventListener('click', () => stopCycle(true));
+            voucherToggle.addEventListener('change', onVoucherToggleChange); // Re-add listener AFTER buttons are replaced
             
             try {
                 const docRef = db.collection('appSettings').doc('global');
@@ -2777,8 +2837,12 @@
         }
 
         async function onVoucherToggleChange(e) {
-            if (!cycleInterval) {
+            if (!cycleInterval) { // Only allow manual toggle if no auto cycle is running
                 await setVoucherToggleState(e.target.checked);
+            } else {
+                // If cycle is running, revert the toggle state and inform the user
+                e.target.checked = (await getVoucherToggleState());
+                showError('adminPanelMessage', 'Cannot manually change voucher generation while the automatic cycle is active.');
             }
         }
 
@@ -2821,8 +2885,8 @@
 
                 await seedInitialVouchers();
                 await initialVoucherLoad();
-                setupVoucherListener();
-                await loadVoucherSequence();
+                setupVoucherListener(); // This now calls loadVoucherSequence internally on updates
+                // await loadVoucherSequence(); // No longer explicitly needed here, listener handles it
 
                 initializeTimeInputs();
                 showPage('dashboard');
