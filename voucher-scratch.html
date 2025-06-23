@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scratch Your Voucher!</title>
+  <link rel="icon" href="data:,">
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      box-sizing: border-box;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #FF69B4 0%, #FF8C00 100%);
+      font-family: 'Segoe UI', sans-serif;
+      overflow-x: hidden;
+    }
+    .container {
+      text-align: center;
+      width: 90%;
+      max-width: 500px;
+      background: rgba(255, 255, 255, 0.98);
+      border-radius: 24px;
+      padding: 30px;
+      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+    }
+    #voucher-title { font-size: 2rem; color: #333; margin-bottom: 8px; }
+    #voucher-subtitle { font-size: 1.1rem; color: #666; margin-bottom: 25px; }
+    .scratch-container {
+      position: relative;
+      width: 100%;
+      padding-top: 56.25%; /* 16:9 Aspect Ratio */
+      margin: 0 auto;
+      border-radius: 16px;
+      overflow: hidden;
+      cursor: crosshair;
+      box-shadow: inset 0 0 15px rgba(0,0,0,0.15);
+    }
+    #scratch-canvas {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 2;
+    }
+    .voucher-info {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      box-sizing: border-box;
+      background: #fff;
+      z-index: 1;
+      color: #333;
+    }
+    .voucher-info h2 { color: #FF8C00; margin-bottom: 15px; }
+    .voucher-info p { margin: 5px 0; font-size: 1.1em; }
+    .action-button {
+      margin-top: 25px;
+      padding: 15px 30px;
+      font-size: 1.1em;
+      font-weight: bold;
+      color: white;
+      background: linear-gradient(90deg, #FF69B4, #FF8C00);
+      border: none;
+      border-radius: 50px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 5px 15px rgba(255, 105, 180, 0.4);
+    }
+    .action-button:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 20px rgba(255, 105, 180, 0.6);
+    }
+    .action-button:disabled {
+      background: #aaa;
+      cursor: not-allowed;
+      box-shadow: none;
+      transform: none;
+    }
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: rgba(0,0,0,0.75);
+      color: white;
+      padding: 12px 24px;
+      border-radius: 50px;
+      z-index: 1000;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.5s, visibility 0.5s, bottom 0.5s;
+    }
+    .toast.show {
+      opacity: 1;
+      visibility: visible;
+      bottom: 30px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+  <div class="voucher-card">
+    <h1 id="voucher-title">You've Received a Voucher!</h1>
+    <p id="voucher-subtitle">Scratch below to see what's inside</p>
+    <div class="scratch-container">
+      <canvas id="scratch-canvas"></canvas>
+      <div class="voucher-info">
+        <h2>Your Voucher Details</h2>
+        <p>Loading...</p>
+      </div>
+    </div>
+    <button id="reveal-btn" class="action-button">Reveal Instantly</button>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+  // Initialize Firebase first
+  const firebaseConfig = {
+    apiKey: "AIzaSyCjx0UgwFsQHFhDChLYjb8HYs0YYHFiwn4",
+    authDomain: "accords-gamming.firebaseapp.com",
+    projectId: "accords-gamming",
+    storageBucket: "accords-gamming.appspot.com",
+    messagingSenderId: "578865144674",
+    appId: "1:578865144674:web:040af4f1ea8dccda53023b",
+    measurementId: "G-ZKZ6FWHFJE"
+  };
+
+  // Initialize Firebase only if not already initialized
+  if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+  }
+  const db = firebase.firestore();
+
+  // --- VARIABLES ---
+  let scratchedLogged = false;
+  let isDrawing = false;
+  const urlParams = new URLSearchParams(window.location.search);
+  const trackingId = urlParams.get('trackingId');
+  const imageUrl = urlParams.get('imageUrl');
+  const canvas = document.getElementById('scratch-canvas');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true }); // Add willReadFrequently
+  const revealBtn = document.getElementById('reveal-btn');
+
+  // --- FUNCTIONS ---
+
+  function setCanvasSize() {
+    const container = document.querySelector('.scratch-container');
+    canvas.width = container.clientWidth;
+    canvas.height = container.clientHeight;
+    initCanvas();
+  }
+
+  function initCanvas() {
+    if (!imageUrl) {
+      ctx.fillStyle = '#ccc';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      return;
+    }
+    const img = new Image();
+    img.crossOrigin = "Anonymous";
+    img.src = imageUrl;
+    img.onload = () => {
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    };
+    img.onerror = () => {
+      ctx.fillStyle = '#BDBDBD';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    };
+  }
+
+ async function fetchVoucherData() {
+    if (!trackingId) {
+        showToast("Invalid voucher link. Missing tracking ID.", true);
+        return;
+    }
+    
+    try {
+        const doc = await db.collection("imageClickTracking").doc(trackingId).get();
+        if (doc.exists) {
+            const data = doc.data();
+            // Update UI...
+            
+            // Check if already scratched
+            if (data.scratched) {
+                revealVoucher(true);
+                revealBtn.disabled = true;
+                revealBtn.textContent = 'Already Revealed';
+            }
+        } else {
+            showToast("Voucher record not found.", true);
+        }
+    } catch (err) {
+        console.error("Error:", err);
+        showToast("Error loading voucher data.", true);
+    }
+}
+  function showToast(message, isError = false) {
+    const toast = document.getElementById('toast');
+    toast.textContent = message;
+    toast.style.backgroundColor = isError ? '#dc3545' : 'rgba(0,0,0,0.75)';
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3000);
+  }
+
+  // Replace the existing logScratchEvent function with this:
+async function logScratchEvent() {
+    if (scratchedLogged || !trackingId) return;
+    
+    try {
+        if (!db) {
+            showToast("Database not initialized", true);
+            return;
+        }
+
+        // Get the current document first
+        const docRef = db.collection("imageClickTracking").doc(trackingId);
+        const doc = await docRef.get();
+
+        if (!doc.exists) {
+            showToast("Voucher record not found", true);
+            return;
+        }
+
+        // Update only the necessary fields
+        await docRef.update({
+            scratched: true,
+            scratchedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            lastView: firebase.firestore.FieldValue.serverTimestamp(),
+            viewCount: firebase.firestore.FieldValue.increment(1)
+        });
+
+        scratchedLogged = true;
+        showToast("Voucher scratched successfully!");
+        revealBtn.disabled = true;
+        revealBtn.textContent = 'Voucher Revealed!';
+        
+        // Force a UI update
+        revealVoucher(true);
+        
+    } catch (err) {
+        console.error("Scratch error:", err);
+        showToast("Error saving scratch status", true);
+        revealBtn.disabled = false;
+        revealBtn.textContent = 'Reveal Instantly';
+    }
+}
+
+  function revealVoucher(instant = false) {
+    if (!instant) {
+      canvas.style.transition = 'opacity 0.5s ease';
+    }
+    canvas.style.opacity = '0';
+    // Always attempt to log the scratch event when revealed
+    logScratchEvent(); 
+  }
+
+  function updateScratchedPercentage() {
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+    let transparentPixels = 0;
+    for (let i = 3; i < data.length; i += 4) {
+      if (data[i] === 0) { // Check for alpha channel (0 = fully transparent)
+        transparentPixels++;
+      }
+    }
+    const totalPixels = canvas.width * canvas.height;
+    const scratchedPercentage = (transparentPixels / totalPixels) * 100;
+    if (scratchedPercentage > 50) {
+      revealVoucher();
+    }
+  }
+  
+  const getEventLocation = e => {
+    const rect = canvas.getBoundingClientRect();
+    if (e.touches) {
+      return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+    }
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  };
+
+  function scratch(e) {
+    if (!isDrawing) return;
+    e.preventDefault();
+    const { x, y } = getEventLocation(e);
+    ctx.globalCompositeOperation = 'destination-out'; // This makes drawn areas transparent
+    ctx.beginPath();
+    ctx.arc(x, y, 25, 0, Math.PI * 2); // Draw a circle (eraser)
+    ctx.fill();
+    updateScratchedPercentage();
+  }
+
+  function startScratch(e) { 
+    isDrawing = true; 
+    // Draw immediately on touch/click down
+    scratch(e); 
+  }
+  function endScratch() { 
+    isDrawing = false; 
+    // Also check percentage when lifting finger/mouse
+    updateScratchedPercentage();
+  }
+
+  // --- EVENT LISTENERS ---
+  window.addEventListener('DOMContentLoaded', () => {
+    setCanvasSize();
+    fetchVoucherData();
+    
+    canvas.addEventListener('mousedown', startScratch);
+    canvas.addEventListener('mouseup', endScratch);
+    canvas.addEventListener('mousemove', scratch);
+    canvas.addEventListener('mouseleave', endScratch); // Important for mouse users
+
+    canvas.addEventListener('touchstart', startScratch, { passive: false });
+    canvas.addEventListener('touchend', endScratch);
+    canvas.addEventListener('touchmove', scratch, { passive: false });
+    
+    revealBtn.addEventListener('click', () => revealVoucher(false));
+    window.addEventListener('resize', setCanvasSize);
+  });
+</script>
+</body>
+</html>

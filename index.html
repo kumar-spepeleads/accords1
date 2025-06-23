@@ -1,0 +1,2792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accords</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-auth-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-firestore-compat.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        /* CSS Variables for better maintainability and consistency */
+        :root {
+            --primary-color: #FF8C00; /* DarkOrange - Main UI blue changed to orange */
+            --secondary-color: #FF69B4; /* HotPink - Deep purple changed to pink */
+            --accent-color: #FFB6C1; /* LightPink - Bright yellow changed to light pink */
+            --dark-text: #212529; /* Darker text for contrast */
+            --light-text: #f8f9fa; /* Off-white for light text */
+            --bg-light: rgba(255, 255, 255, 0.98); /* Near opaque white */
+            --bg-dark-transparent: rgba(0, 0, 0, 0.3); /* Slightly darker transparent */
+            --border-light: rgba(255, 255, 255, 0.3);
+            --shadow-light: rgba(0, 0, 0, 0.15); /* Stronger light shadow */
+            --shadow-strong: rgba(0, 0, 0, 0.3); /* Even stronger shadow */
+            --error-color: #dc3545; /* Red */
+            --success-color: #28a745; /* Green */
+            --border-radius-large: 24px; /* More rounded */
+            --border-radius-medium: 16px;
+            --border-radius-small: 10px;
+            --transition-speed: 0.4s; /* Slower, smoother transitions */
+        }
+
+        /* General Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif; /* Changed to Inter */
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            min-height: 100vh;
+            color: var(--dark-text);
+            line-height: 1.6;
+            display: flex; /* Use flexbox for centering */
+            justify-content: center;
+            align-items: center;
+            padding: 20px; /* Add padding for smaller screens */
+            position: relative; /* For the animated background */
+        }
+
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            /* Changed background flow colors for a new vibrant look matching orange/pink theme */
+            background: linear-gradient(45deg, #FF8C00, #FF69B4, #FFD700, #FF6347); 
+            background-size: 400% 400%;
+            animation: backgroundFlow 20s ease infinite;
+            opacity: 0.1; /* Subtle overlay */
+            z-index: -2; /* Behind everything */
+        }
+
+        @keyframes backgroundFlow {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        .container {
+            width: 100%; /* Make container full width within body padding */
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: transparent; /* Ensure container itself is transparent */
+            z-index: 1; /* Ensure content is above animated background */
+            position: relative;
+        }
+        
+        /* Header */
+        .header {
+            background: rgba(255, 255, 255, 0.15); /* More subtle transparent white */
+            backdrop-filter: blur(12px); /* Stronger blur */
+            color: var(--light-text);
+            padding: 35px; /* More padding */
+            text-align: center;
+            margin-bottom: 40px; /* More space below header */
+            border-radius: var(--border-radius-large);
+            border: 1px solid var(--border-light);
+            box-shadow: 0 10px 40px var(--shadow-strong); /* Stronger shadow */
+            position: relative;
+            overflow: hidden; /* For pseudo-elements */
+        }
+        
+        .header::before { /* Animated light overlay */
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            transform: rotate(45deg);
+            animation: headerLight 15s linear infinite;
+            opacity: 0.5;
+        }
+
+        @keyframes headerLight {
+            0% { transform: rotate(0deg) scale(1); opacity: 0.5; }
+            50% { transform: rotate(180deg) scale(1.1); opacity: 0.7; }
+            100% { transform: rotate(360deg) scale(1); opacity: 0.5; }
+        }
+
+        .header h1 {
+            font-family: 'Poppins', sans-serif;
+            font-size: 3.2rem; /* Even larger */
+            margin-bottom: 12px;
+            text-shadow: 3px 3px 8px rgba(0,0,0,0.5); /* Deeper shadow */
+            letter-spacing: 1.5px;
+            z-index: 1; /* Bring text to front */
+            position: relative;
+        }
+        
+        .header p {
+            font-size: 1.25rem; /* Larger */
+            opacity: 0.9;
+            font-weight: 300;
+            z-index: 1; /* Bring text to front */
+            position: relative;
+        }
+
+        .header .btn.secondary { 
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px; 
+            font-size: 0.95rem;
+            background: rgba(255, 255, 255, 0.25); /* More prominent transparent background */
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            border-radius: var(--border-radius-medium);
+            transition: all var(--transition-speed) ease;
+        }
+
+        .header .btn.secondary:hover {
+            background: rgba(255, 255, 255, 0.4);
+            transform: translateY(-2px) scale(1.02); /* Added slight scale */
+            box-shadow: 0 6px 15px rgba(0,0,0,0.4);
+        }
+        
+        /* Page Display */
+        .page {
+            display: none;
+        }
+        
+        .page.active {
+            display: block;
+        }
+        
+        /* Auth Container */
+        .auth-container, .dashboard-container { 
+            max-width: 550px; /* Wider */
+            margin: 0 auto;
+            background: var(--bg-light);
+            backdrop-filter: blur(10px);
+            padding: 45px; /* More padding */
+            border-radius: var(--border-radius-large);
+            box-shadow: 0 25px 50px var(--shadow-strong); /* Much stronger shadow */
+            border: 1px solid rgba(0,0,0,0.05); /* Very subtle border */
+        }
+        
+        .auth-tabs {
+            display: flex;
+            margin-bottom: 35px; /* More spacing */
+            background: #eef2f7; /* Lighter background for tabs */
+            border-radius: var(--border-radius-medium);
+            padding: 8px; /* More padding */
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.05); /* Inner shadow */
+        }
+        
+        .auth-tab {
+            flex: 1;
+            padding: 16px 30px; /* More padding */
+            text-align: center;
+            background: transparent;
+            border: none;
+            border-radius: var(--border-radius-small);
+            cursor: pointer;
+            font-weight: 600; /* Slightly less bold than active */
+            transition: all var(--transition-speed) ease;
+            color: #607d8b;
+            font-size: 1.1rem;
+        }
+        
+        .auth-tab.active {
+            background: linear-gradient(90deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: var(--light-text);
+            box-shadow: 0 6px 20px rgba(255, 140, 0, 0.4); /* Stronger shadow with new primary color */
+            font-weight: 700;
+        }
+        .auth-tab:hover:not(.active) {
+            background-color: #e0e6ec; /* Hover effect for inactive tabs */
+            transform: translateY(-2px); /* Slight lift on hover */
+        }
+        
+        .auth-form {
+            display: none;
+        }
+        
+        .auth-form.active {
+            display: block;
+            animation: fadeIn 0.5s ease-out; /* Longer animation */
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); } 
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .form-group {
+            margin-bottom: 30px; /* More spacing */
+            position: relative;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px; /* Slightly less spacing for cleaner look */
+            font-weight: 500; /* Medium weight */
+            color: var(--dark-text);
+            font-size: 1rem;
+        }
+        
+        input, textarea, select {
+            width: 100%;
+            padding: 18px 20px; /* More padding */
+            border: 1px solid #dcdfe6; /* Lighter, subtle border */
+            border-radius: var(--border-radius-medium);
+            font-size: 18px; /* Larger font */
+            transition: all var(--transition-speed) ease;
+            background: #ffffff; /* Pure white background */
+            color: var(--dark-text);
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.08); /* Subtle inner shadow */
+        }
+        
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: var(--secondary-color); /* Highlight with secondary color */
+            box-shadow: 0 0 0 4px rgba(255, 105, 180, 0.2); /* More prominent shadow with new secondary color */
+            transform: scale(1.01); /* Slight enlarge on focus */
+        }
+
+        /* Placeholder styling */
+        input::placeholder, textarea::placeholder {
+            color: #aeb8c4;
+            opacity: 1; 
+        }
+        
+        /* Buttons */
+        .btn {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: var(--light-text);
+            padding: 18px 35px; /* More padding */
+            border: none;
+            border-radius: var(--border-radius-medium);
+            cursor: pointer;
+            font-size: 18px; /* Larger font */
+            font-weight: 700; 
+            margin-right: 18px; /* More margin */
+            margin-bottom: 12px;
+            transition: all var(--transition-speed) ease;
+            box-shadow: 0 8px 25px rgba(255, 140, 0, 0.4); /* Stronger shadow with new primary color */
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px; /* More space between icon and text */
+            position: relative;
+            overflow: hidden;
+            z-index: 1;
+        }
+        
+        .btn::before { /* Gradient hover effect */
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(120deg, transparent, rgba(255,255,255,0.3), transparent);
+            transition: all var(--transition-speed) ease;
+            z-index: -1;
+        }
+
+        .btn:hover::before {
+            left: 100%;
+        }
+
+        .btn:hover {
+            transform: translateY(-5px) scale(1.02); /* More noticeable lift and slight scale */
+            box-shadow: 0 12px 30px rgba(255, 140, 0, 0.6); 
+        }
+        
+        .btn:active {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 15px rgba(255, 140, 0, 0.3);
+        }
+        
+        .btn.secondary {
+            background: linear-gradient(135deg, #6c757d 0%, #343a40 100%); /* Desaturated blue/grey, kept for secondary action clarity */
+            box-shadow: 0 8px 25px rgba(108, 117, 125, 0.4);
+        }
+        
+        .btn.secondary:hover {
+            box-shadow: 0 12px 30px rgba(108, 117, 125, 0.6);
+        }
+
+        /* New Green Button Style */
+        .btn-green {
+            background: linear-gradient(135deg, #28a745 0%, #218838 100%); /* A vibrant green gradient */
+            box-shadow: 0 8px 25px rgba(40, 167, 69, 0.4);
+        }
+
+        .btn-green:hover {
+            box-shadow: 0 12px 30px rgba(40, 167, 69, 0.6);
+        }
+        
+        .btn.whatsapp {
+            background: linear-gradient(135deg, #25D366 0%, #128C7E 100%); /* Kept WhatsApp green */
+            box-shadow: 0 8px 25px rgba(37, 211, 102, 0.4);
+        }
+        
+        .btn.whatsapp:hover {
+            box-shadow: 0 12px 30px rgba(37, 211, 102, 0.6);
+        }
+
+        .btn.instagram { 
+            background: linear-gradient(135deg, #E1306C 0%, #C13584 50%, #833AB4 100%); /* Kept Instagram's pink/purple gradient */
+            box-shadow: 0 8px 25px rgba(225, 48, 108, 0.4);
+        }
+
+        .btn.instagram:hover {
+            box-shadow: 0 12px 30px rgba(225, 48, 108, 0.6);
+        }
+        
+        .btn.voucher {
+            background: linear-gradient(135deg, #FFD700 0%, #FF69B4 100%); /* Gold to HotPink for voucher */
+            box-shadow: 0 8px 25px rgba(255, 215, 0, 0.4);
+        }
+        
+        .btn.voucher:hover {
+            box-shadow: 0 12px 30px rgba(255, 215, 0, 0.6);
+        }
+
+        .btn.manual-share { 
+            background: linear-gradient(135deg, #FFDAB9 0%, #FFA07A 100%); /* PeachPuff to LightSalmon for manual share */
+            box-shadow: 0 8px 25px rgba(255, 218, 185, 0.4);
+        }
+
+        .btn.manual-share:hover {
+            box-shadow: 0 12px 30px rgba(255, 218, 185, 0.6);
+        }
+
+        .btn.copy-bill { 
+            background: linear-gradient(135deg, #4CAF50 0%, #2e7d32 100%); /* Kept green for copy */
+            box-shadow: 0 8px 25px rgba(76, 175, 80, 0.4);
+        }
+
+        .btn.copy-bill:hover {
+            box-shadow: 0 12px 30px rgba(76, 175, 80, 0.6);
+        }
+
+        .btn.delete-bill { 
+             background: linear-gradient(135deg, #FF6347 0%, #CD5C5C 100%); /* Tomato to IndianRed for delete */
+             box-shadow: 0 8px 25px rgba(255, 99, 71, 0.4);
+        }
+        .btn.delete-bill:hover {
+            box-shadow: 0 12px 30px rgba(255, 99, 71, 0.6);
+        }
+        
+        .btn-full {
+            width: 100%;
+            margin-right: 0;
+        }
+
+        .btn img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 50%; /* Ensure the image is circular */
+        }
+        .btn span.gift-text {
+            position: absolute;
+            color: white;
+            font-size: 1.5em; /* Adjust size as needed */
+            text-shadow: 1px 1px 2px black;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+        }
+        
+        /* Sign Up CTA */
+        .signup-cta {
+            text-align: center;
+            margin-top: 40px; 
+            padding: 30px; 
+            background: linear-gradient(135deg, #fce4ec 0%, #fffafa 100%); /* Light pink to white */
+            border-radius: var(--border-radius-medium);
+            border: 1px solid rgba(0,0,0,0.05); 
+            box-shadow: 0 6px 20px rgba(0,0,0,0.08); 
+        }
+        
+        .signup-cta h3 {
+            color: var(--primary-color);
+            margin-bottom: 12px;
+            font-size: 1.3rem; 
+            font-family: 'Poppins', sans-serif;
+        }
+        
+        .signup-cta p {
+            color: #5f7c8d;
+            font-size: 1.0rem;
+            margin-bottom: 25px; 
+        }
+        
+        /* Dashboard */
+        .dashboard-container {
+            max-width: 95%; /* Even wider for dashboard */
+            padding: 40px;
+        }
+        
+        .nav-buttons {
+            margin-bottom: 40px; 
+            text-align: center;
+            display: flex;
+            gap: 25px; /* More gap */
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .nav-buttons .btn {
+            min-width: 160px; 
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); /* Larger min width for cards */
+            gap: 30px; /* More gap */
+            margin-bottom: 40px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: var(--light-text);
+            padding: 35px; /* More padding */
+            border-radius: var(--border-radius-large);
+            text-align: center;
+            box-shadow: 0 15px 35px rgba(255, 140, 0, 0.5); /* Stronger shadow with primary color */
+            transition: transform var(--transition-speed) ease, box-shadow var(--transition-speed) ease;
+            position: relative;
+            overflow: hidden; 
+            transform-style: preserve-3d; /* For 3D tilt effect */
+            border: 1px solid rgba(255,255,255,0.2); /* Subtle border for stats */
+        }
+
+        .stat-card::before { /* Background pattern */
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml;utf8,<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="20" cy="20" r="5" fill="%23ffffff" opacity="0.1"/><circle cx="80" cy="80" r="5" fill="%23ffffff" opacity="0.1"/></svg>');
+            background-size: 50px;
+            opacity: 0.8;
+            z-index: 0;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-10px) rotateX(2deg) rotateY(2deg); /* More dynamic lift and tilt */
+            box-shadow: 0 20px 45px rgba(255, 140, 0, 0.7);
+        }
+        
+        .stat-card h3 {
+            font-family: 'Poppins', sans-serif;
+            font-size: 3.2rem; /* Larger font size */
+            margin-bottom: 12px;
+            text-shadow: 2px 2px 6px rgba(0,0,0,0.4);
+            position: relative;
+            z-index: 1;
+        }
+        
+        .stat-card p {
+            opacity: 0.9;
+            font-weight: 500;
+            font-size: 1.15rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        h2 {
+            font-family: 'Poppins', sans-serif;
+            font-size: 2.4rem; /* Larger title */
+            color: var(--primary-color); /* Kept primary color for titles */
+            margin-bottom: 30px;
+            text-align: center;
+            border-bottom: 3px solid rgba(255, 140, 0, 0.2); /* Thicker border based on new primary */
+            padding-bottom: 12px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+        }
+        
+        .bill-item {
+            background: var(--bg-light);
+            backdrop-filter: blur(10px);
+            padding: 30px; /* More padding */
+            margin-bottom: 25px; /* More spacing */
+            border-radius: var(--border-radius-large);
+            /* Bill item left border color for dashboard (staff) */
+            border-left: 8px solid var(--secondary-color); /* Pink border for staff history */
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1); /* Stronger subtle shadow */
+            transition: transform var(--transition-speed) ease, box-shadow var(--transition-speed) ease;
+            display: flex;
+            align-items: flex-start;
+            gap: 25px; /* More space */
+            position: relative;
+            overflow: hidden;
+        }
+        
+        /* Style for admin bill history items */
+        .admin-bill-item {
+            background: var(--bg-light);
+            backdrop-filter: blur(10px);
+            padding: 30px;
+            margin-bottom: 25px;
+            border-radius: var(--border-radius-large);
+            /* Bill item left border color for admin panel */
+            border-left: 8px solid var(--primary-color); /* Orange border for admin history */
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+            transition: transform var(--transition-speed) ease, box-shadow var(--transition-speed) ease;
+            display: flex;
+            align-items: flex-start;
+            gap: 25px;
+            position: relative;
+            overflow: hidden;
+        }
+
+
+        .bill-item:hover, .admin-bill-item:hover {
+            transform: translateX(10px) scale(1.01); /* More prominent slide and slight scale */
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        }
+
+        .bill-item-image { 
+            width: 90px; /* Larger image */
+            height: 90px; 
+            object-fit: cover;
+            border-radius: var(--border-radius-medium);
+            flex-shrink: 0; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15); /* Shadow on image */
+        }
+
+        .bill-item-content { 
+            flex-grow: 1; 
+            position: relative; /* For z-index of content */
+            z-index: 1;
+        }
+        
+        .bill-item h4, .admin-bill-item h4 {
+            color: var(--dark-text); /* Changed to dark text */
+            margin-bottom: 8px; /* Slightly less spacing */
+            font-size: 1.4rem; /* Larger font */
+            font-family: 'Poppins', sans-serif;
+        }
+
+        .bill-item p, .admin-bill-item p {
+            margin-bottom: 5px;
+            font-size: 1rem;
+            color: #4c5a6b; /* Slightly darker grey */
+        }
+
+        .bill-item p strong, .admin-bill-item p strong {
+            color: var(--dark-text); /* Keep strong text dark */
+        }
+        
+        .bill-actions {
+            margin-top: 25px; /* More margin */
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px; /* More gap */
+            align-items: center;
+        }
+        
+        .bill-actions button {
+            padding: 12px 20px; /* More padding */
+            font-size: 16px; /* Slightly larger */
+            border-radius: var(--border-radius-small);
+        }
+
+        .bill-actions .dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .bill-actions .dropdown-content {
+            display: none;
+            position: absolute;
+            background-color: var(--light-text);
+            min-width: 200px; /* Increased min-width */
+            box-shadow: 0px 10px 20px 0px var(--shadow-light); /* Stronger shadow */
+            z-index: 1001;
+            border-radius: var(--border-radius-small);
+            bottom: 100%; 
+            left: 0;
+            margin-bottom: 10px; /* More spacing from the button */
+            overflow: hidden; 
+            border: 1px solid #e0e6ec;
+        }
+
+        .bill-actions .dropdown-content a {
+            color: var(--dark-text);
+            padding: 14px 20px; /* More padding */
+            text-decoration: none;
+            display: block;
+            font-size: 16px;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .bill-actions .dropdown-content a:hover {
+            background-color: var(--primary-color);
+            color: var(--light-text);
+        }
+
+        .bill-actions .dropdown:hover .dropdown-content {
+            display: block;
+        }
+        
+        /* Messages */
+        .error, .success {
+            margin-top: 25px; 
+            padding: 18px 25px; 
+            border-radius: var(--border-radius-medium);
+            font-weight: 600;
+            font-size: 1.05rem;
+            text-align: center;
+            animation: fadeIn 0.4s ease-out;
+            border: 1px solid; /* Add border for better definition */
+        }
+
+        .error {
+            color: var(--error-color);
+            background: rgba(220, 53, 69, 0.1); 
+            border-color: var(--error-color); 
+        }
+        
+        .success {
+            color: var(--success-color);
+            background: rgba(40, 167, 69, 0.1); 
+            border-color: var(--success-color); 
+        }
+        
+        /* Floating Shapes Background */
+        .floating-shapes {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            z-index: -1;
+            pointer-events: none; /* Make shapes not interfere with clicks */
+        }
+        
+        .shape {
+            position: absolute;
+            background: var(--light-text);
+            opacity: 0.06; 
+            animation: float 15s ease-in-out infinite; 
+            filter: blur(5px); /* Add blur for softer look */
+            transform-origin: center center;
+        }
+        
+        .shape:nth-child(1) {
+            top: 15%;
+            left: 8%;
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            animation-delay: 0s;
+            animation-duration: 18s;
+        }
+        
+        .shape:nth-child(2) {
+            top: 55%;
+            right: 12%;
+            width: 100px;
+            height: 100px;
+            border-radius: 40% 60% 60% 40% / 40% 40% 60% 60%; /* More organic shape */
+            animation-delay: 4s;
+            animation-duration: 20s;
+        }
+        
+        .shape:nth-child(3) {
+            bottom: 10%;
+            left: 20%;
+            width: 140px;
+            height: 140px;
+            border-radius: 40px; 
+            animation-delay: 8s;
+            animation-duration: 16s;
+        }
+
+        .shape:nth-child(4) { 
+            top: 25%;
+            left: 50%;
+            width: 80px;
+            height: 80px;
+            background: var(--accent-color); 
+            opacity: 0.04;
+            border-radius: 50%;
+            animation-delay: 2s;
+            animation-duration: 17s;
+        }
+
+        .shape:nth-child(5) { /* Added a fifth shape */
+            bottom: 30%;
+            right: 5%;
+            width: 90px;
+            height: 90px;
+            background: var(--primary-color);
+            opacity: 0.05;
+            border-radius: 30% 70% 50% 50% / 50% 50% 70% 30%;
+            animation-delay: 6s;
+            animation-duration: 22s;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg) scale(1); }
+            25% { transform: translateY(-30px) rotate(45deg) scale(1.08); } 
+            50% { transform: translateY(0px) rotate(90deg) scale(1); }
+            75% { transform: translateY(30px) rotate(135deg) scale(0.92); }
+            100% { transform: translateY(0px) rotate(180deg) scale(1); }
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            body {
+                padding: 15px; /* Adjust body padding */
+            }
+
+            .container {
+                padding: 10px;
+            }
+            
+            .header {
+                padding: 30px 20px;
+                margin-bottom: 30px;
+            }
+
+            .header h1 {
+                font-size: 2.5rem;
+            }
+            
+            .header p {
+                font-size: 1.1rem;
+            }
+
+            .header .btn.secondary {
+                position: static; 
+                margin-top: 15px;
+                display: block; 
+                width: 100%; /* Full width for logout button */
+                text-align: center;
+                margin-left: auto;
+                margin-right: auto;
+            }
+
+            .auth-container, .dashboard-container {
+                padding: 35px 25px;
+            }
+            
+            .nav-buttons {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 15px;
+            }
+            
+            .nav-buttons .btn {
+                width: 100%; 
+                margin-bottom: 0;
+            }
+            
+            .stats {
+                grid-template-columns: 1fr;
+                gap: 25px;
+            }
+
+            .bill-item, .admin-bill-item {
+                padding: 20px;
+                flex-direction: column; 
+                align-items: center; 
+                text-align: center; /* Center text within bill item */
+            }
+            .bill-item-content {
+                text-align: center; /* Center text for content */
+            }
+             .bill-item-image {
+                margin-bottom: 15px; 
+            }
+
+            .bill-actions {
+                flex-direction: column;
+                align-items: center; /* Center buttons */
+                gap: 12px;
+                width: 100%; /* Ensure actions take full width */
+            }
+
+            .bill-actions button, .bill-actions .dropdown {
+                width: 100%; 
+            }
+
+            .bill-actions .dropdown-content {
+                width: 100%;
+                left: 0;
+                right: 0;
+                min-width: unset; 
+                bottom: 100%; 
+                margin-bottom: 8px;
+                text-align: left; /* Keep dropdown text left-aligned */
+            }
+
+            h2 {
+                font-size: 2rem;
+            }
+        }
+        /* Basic toggle switch style */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-switch .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            -webkit-transition: .4s;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .toggle-switch .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            -webkit-transition: .4s;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        .toggle-switch input:checked + .slider {
+            background-color: var(--primary-color);
+        }
+
+        .toggle-switch input:focus + .slider {
+            box-shadow: 0 0 1px var(--primary-color);
+        }
+
+        .toggle-switch input:checked + .slider:before {
+            -webkit-transform: translateX(26px);
+            -ms-transform: translateX(26px);
+            transform: translateX(26px);
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none; 
+            position: fixed; 
+            z-index: 1000; 
+            left: 0;
+            top: 0;
+            width: 100%; 
+            height: 100%; 
+            overflow: auto; 
+            background-color: rgba(0,0,0,0.6); /* Darker overlay */
+            justify-content: center;
+            align-items: center;
+            padding: 20px; 
+            animation: fadeIn 0.3s ease-out; /* Fade in modal overlay */
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 40px; /* More padding */
+            border: none; 
+            width: 95%; 
+            max-width: 600px; /* Increased max width */
+            border-radius: var(--border-radius-large);
+            box-shadow: 0 20px 60px var(--shadow-strong); /* Stronger shadow */
+            position: relative;
+            animation: zoomIn 0.4s cubic-bezier(0.68, -0.55, 0.27, 1.55); /* More bouncy animation */
+        }
+
+        @keyframes zoomIn {
+            from { transform: scale(0.7); opacity: 0; } 
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .close-button {
+            color: #a0a0a0; 
+            font-size: 36px; /* Larger */
+            font-weight: bold;
+            position: absolute;
+            top: 15px;
+            right: 25px;
+            cursor: pointer;
+            transition: color 0.2s ease, transform 0.2s ease;
+        }
+
+        .close-button:hover,
+        .close-button:focus {
+            color: var(--error-color); 
+            transform: rotate(90deg); /* Spin on hover */
+            text-decoration: none;
+        }
+
+        /* Form row for time inputs */
+        .form-row {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .form-row .form-group {
+            flex: 1;
+            margin-bottom: 0; 
+        }
+
+        @media (max-width: 500px) {
+            .form-row {
+                flex-direction: column;
+                gap: 20px;
+            }
+        }
+
+        /* Styles for Instagram Share Modal */
+        #instagramShareModal .modal-content p {
+            margin-bottom: 20px;
+            font-size: 1.1rem;
+            color: #3f4e5f;
+        }
+        #instagramShareModal .modal-content .bill-preview {
+            background-color: #f0f4f8; /* Lighter background */
+            border: 1px dashed #c0cddb; /* More defined dashed border */
+            padding: 25px;
+            border-radius: var(--border-radius-medium);
+            margin-bottom: 25px;
+            white-space: pre-wrap; 
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace; /* Monospaced font */
+            font-size: 1rem;
+            color: #2c3e50;
+            max-height: 250px; /* Slightly taller */
+            overflow-y: auto;
+            box-shadow: inset 0 1px 5px rgba(0,0,0,0.08); /* Inner shadow */
+        }
+         #billDetailsModal .modal-content h2, #adminLoginModal .modal-content h2, #instagramShareModal .modal-content h2, #confirmationModal .modal-content h2, #voucherManagementModal .modal-content h2, #assignVoucherModal .modal-content h2 { 
+            text-align: center;
+            font-size: 2.2rem; 
+            margin-bottom: 25px; 
+            padding-bottom: 0; 
+            border-bottom: none;
+            color: var(--primary-color);
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.05);
+        }
+
+        /* NEW: Styles for Timer Controls */
+        .timer-controls {
+            background-color: #f0f4f8;
+            padding: 25px;
+            border-radius: var(--border-radius-medium);
+            margin-bottom: 30px;
+            border: 1px solid #dcdfe6;
+        }
+        .timer-display-container {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        #timerDisplay {
+            font-size: 3.5rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            font-family: 'Poppins', sans-serif;
+            letter-spacing: 2px;
+        }
+        #cycleStatus {
+            font-size: 1.2rem;
+            font-weight: 500;
+            color: #4c5a6b;
+        }
+        #cycleStatus.active {
+            color: var(--success-color);
+        }
+         #cycleStatus.break {
+            color: var(--error-color);
+        }
+
+        /* NEW: Styles for Voucher Management */
+        .voucher-item-admin {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            border-bottom: 1px solid #e0e6ec;
+        }
+        .voucher-item-admin:last-child {
+            border-bottom: none;
+        }
+        .voucher-item-admin-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .voucher-item-admin-info img {
+            width: 50px;
+            height: 50px;
+            border-radius: var(--border-radius-small);
+            object-fit: cover;
+        }
+        .voucher-item-admin-actions .btn {
+            padding: 8px 12px;
+            font-size: 14px;
+            margin: 0 5px;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="floating-shapes">
+        <div class="shape"></div>
+        <div class="shape"></div>
+        <div class="shape"></div>
+        <div class="shape"></div> 
+        <div class="shape"></div> 
+    </div>
+
+    <div id="landingPage" class="page active">
+        <div class="container">
+            <div class="header">
+                <h1>🎮 Accords</h1>
+                <p>Professional billing solution for your gaming center</p>
+            </div>
+            
+            <div class="auth-container">
+                <div class="auth-tabs">
+                    <button class="auth-tab active" onclick="switchAuthTab('login')">Sign In</button>
+                    <button class="auth-tab" onclick="switchAuthTab('register')">Sign Up</button>
+                </div>
+                
+                <div id="loginForm" class="auth-form active">
+                    <form id="loginFormElement">
+                        <div class="form-group">
+                            <label for="loginEmail">Email Address:</label>
+                            <input type="email" id="loginEmail" required placeholder="Enter your email">
+                        </div>
+                        <div class="form-group">
+                            <label for="loginPassword">Password:</label>
+                            <input type="password" id="loginPassword" required placeholder="Enter your password">
+                        </div>
+                        <button type="submit" class="btn btn-full"><i class="fas fa-sign-in-alt"></i> Sign In</button>
+                    </form>
+                    <div id="loginError" class="error" style="display:none;"></div>
+                    
+                    <div class="signup-cta">
+                        <h3>New to Game Zone?</h3>
+                        <p>Create your staff account today and start managing your gaming center efficiently!</p>
+                        <button class="btn secondary" onclick="switchAuthTab('register')"><i class="fas fa-user-plus"></i> Sign Up for Free</button>
+                    </div>
+                </div>
+                
+                <div id="registerForm" class="auth-form">
+                    <form id="registerFormElement">
+                        <div class="form-group">
+                            <label for="registerName">Full Name:</label>
+                            <input type="text" id="registerName" required placeholder="Enter your full name">
+                        </div>
+                        <div class="form-group">
+                            <label for="registerEmail">Email Address:</label>
+                            <input type="email" id="registerEmail" required placeholder="Enter your email">
+                        </div>
+                        <div class="form-group">
+                            <label for="registerPassword">Create Password:</label>
+                            <input type="password" id="registerPassword" required placeholder="Create a strong password" minlength="6">
+                        </div>
+                        <button type="submit" class="btn btn-full"><i class="fas fa-user-check"></i> Create Account</button>
+                    </form>
+                    <div id="registerError" class="error" style="display:none;"></div>
+                    <div id="registerSuccess" class="success" style="display:none;"></div>
+                    
+                    <div class="signup-cta">
+                        <h3>Already have an account?</h3>
+                        <p>Sign in to access your dashboard and manage your billing system.</p>
+                        <button class="btn secondary" onclick="switchAuthTab('login')"><i class="fas fa-arrow-right-to-bracket"></i> Sign In</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="dashboardPage" class="page">
+        <div class="container">
+            <div class="header">
+                <h1>🎮 Accords Game Zone Dashboard</h1>
+                <p>Welcome, <span id="userName"></span></p>
+                <button onclick="logout()" class="btn secondary">Logout <i class="fas fa-right-from-bracket"></i></button>
+            </div>
+            
+            <div class="dashboard-container">
+                <div class="nav-buttons">
+                    <button class="btn btn-green" onclick="showSection('newBill')">📝 New Bill</button>
+                    <button class="btn btn-green" onclick="showSection('history')">📊 Bill History</button>
+                    <button class="btn secondary" onclick="showAdminLogin()">🔑 Admin</button>
+                    <a href="tracking.html">
+                        <button class="btn btn-green">Track Users</button>
+                    </a>
+                </div>
+                
+                <div class="stats">
+                    <div class="stat-card">
+                        <h3 id="todayRevenue">₹0</h3>
+                        <p>Today's Revenue</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3 id="todaySessions">0</h3>
+                        <p>Today's Sessions</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3 id="totalCustomers">0</div>
+                        <p>Total Bills</p>
+                    </div>
+                </div>
+                
+                <div id="newBillSection">
+                    <h2>📝 Create New Bill</h2>
+                    <form id="billForm">
+                        <div class="form-group">
+                            <label for="customerName">Customer Name:</label>
+                            <input type="text" id="customerName" required placeholder="Enter customer name">
+                        </div>
+                        <div class="form-group">
+                            <label for="customerContact">Customer Contact (Phone or Instagram ID):</label>
+                            <input type="text" id="customerContact" placeholder="e.g., +919876543210 or @customer_handle">
+                            <small style="color: #666; display: block; margin-top: 5px;">Enter phone for WhatsApp or Instagram ID for direct link.</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="numberOfPeople">Number of People:</label>
+                            <input type="number" id="numberOfPeople" min="1" required placeholder="Enter number of people">
+                        </div>
+                        <div class="form-group">
+                            <label for="entryId">Entry ID (Optional):</label>
+                            <input type="text" id="entryId" placeholder="Enter entry ID if applicable">
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="timeIn">Time In:</label>
+                                <input type="datetime-local" id="timeIn" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="timeOut">Time Out:</label>
+                                <input type="datetime-local" id="timeOut" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="amount">Amount (₹):</label>
+                            <input type="number" id="amount" min="0" step="0.01" required placeholder="Enter amount">
+                        </div>
+                        <div class="form-group">
+                            <label for="remarks">Remarks:</label>
+                            <textarea id="remarks" rows="3" placeholder="Enter any additional remarks"></textarea>
+                        </div>
+                        
+                        <button type="submit" class="btn"><i class="fas fa-file-invoice"></i> Create Bill</button>
+                        <button type="button" onclick="clearForm()" class="btn secondary"><i class="fas fa-eraser"></i> Clear Form</button>
+                    </form>
+                    <div id="billError" class="error" style="display:none;"></div>
+                    <div id="billSuccess" class="success" style="display:none;"></div>
+                </div>
+                
+                <div id="historySection" style="display:none;">
+                    <h2>📊 Bill History</h2>
+                    <div class="form-group">
+                        <input type="text" id="searchBills" placeholder="Search by customer name or contact info...">
+                    </div>
+                    <div id="billsList"></div>
+                    <div id="noBillsMessage" class="error" style="display:none; text-align: center;">No bills found for today.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="adminPage" class="page">
+        <div class="container">
+            <div class="header">
+                <h1>🔑 Admin Panel</h1>
+                <p>Manage your system settings and data</p> 
+                <button onclick="showPage('dashboard')" class="btn secondary">Back to Dashboard <i class="fas fa-arrow-left"></i></button>
+                <button onclick="logout()" class="btn secondary">Logout <i class="fas fa-right-from-bracket"></i></button>
+            </div>
+            <div class="dashboard-container">
+                 <!-- NEW: Voucher Management Button -->
+                 <div class="nav-buttons" style="margin-bottom: 30px;">
+                    <button class="btn voucher" onclick="openModal('voucherManagementModal')"><i class="fas fa-tags"></i> Manage Vouchers</button>
+                </div>
+
+                <!-- Auto Voucher Cycle Controls -->
+                <div class="timer-controls">
+                    <h2>Automatic Voucher Cycle</h2>
+                    <div class="timer-display-container">
+                        <div id="timerDisplay">00:00</div>
+                        <div id="cycleStatus">Stopped</div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="activeDuration">Active Duration (minutes)</label>
+                            <input type="number" id="activeDuration" value="20" min="1" placeholder="e.g., 30">
+                        </div>
+                        <div class="form-group">
+                            <label for="breakDuration">Break Duration (minutes)</label>
+                            <input type="number" id="breakDuration" value="20" min="1" placeholder="e.g., 30">
+                        </div>
+                    </div>
+                    <div class="nav-buttons" style="margin-bottom: 20px;">
+                        <button class="btn btn-green" id="startCycleBtn"><i class="fas fa-play"></i> Start Cycle</button>
+                        <button class="btn delete-bill" id="stopCycleBtn"><i class="fas fa-stop"></i> Stop Cycle</button>
+                    </div>
+                </div>
+
+                <!-- MODIFIED: Voucher Toggle -->
+                <div class="form-group">
+                    <label for="voucherToggle" style="display: flex; align-items: center; gap: 10px; font-weight: 600;">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="voucherToggle">
+                            <span class="slider round"></span>
+                        </label>
+                        <span id="voucherToggleLabel">Manual Voucher Generation</span>
+                    </label>
+                    <small style="color: #666; display: block; margin-top: 5px;">This shows the current status of voucher generation. It is controlled automatically by the cycle when active.</small>
+                </div>
+
+                <div id="adminPanelMessage" class="success" style="display:none;"></div>
+
+                <h2>📊 All Bill History</h2>
+                <div class="form-group">
+                    <input type="text" id="adminSearchBills" placeholder="Search by customer name or contact info...">
+                </div>
+                <div id="adminBillsList"></div>
+                <div id="noAdminBillsMessage" class="error" style="display:none; text-align: center;">No bills found in the system.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="adminLoginModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" onclick="closeModal('adminLoginModal')">&times;</span>
+            <h2>Admin Login</h2>
+            <form id="adminLoginFormElement">
+                <div class="form-group">
+                    <label for="adminLoginEmail">Email Address:</label>
+                    <input type="email" id="adminLoginEmail" required placeholder="Enter admin email">
+                </div>
+                <div class="form-group">
+                    <label for="adminLoginPassword">Password:</label>
+                    <input type="password" id="adminLoginPassword" required placeholder="Enter admin password">
+                </div>
+                <button type="submit" class="btn btn-full"><i class="fas fa-unlock-alt"></i> Login as Admin</button>
+            </form>
+            <div id="adminLoginError" class="error" style="display:none;"></div>
+        </div>
+    </div>
+
+    <div id="billDetailsModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" onclick="closeModal('billDetailsModal')">&times;</span>
+            <h2 id="billDetailsTitle">Bill Details</h2> <div id="billDetailsContent"></div>
+            <div id="billDetailsActions" class="bill-actions" style="margin-top: 25px;">
+                <!-- Buttons will be dynamically loaded here based on user role -->
+            </div>
+            <div id="billDetailsMessage" class="success" style="display:none;"></div> </div>
+    </div>
+
+    <div id="instagramShareModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" onclick="closeModal('instagramShareModal')">&times;</span>
+            <h2>📸 Share Bill on Instagram</h2>
+            <p>Direct sharing of bill content to Instagram is not supported via web. Please copy the bill details below and paste them manually into an Instagram message or post.</p>
+            <div id="instagramBillPreview" class="bill-preview"></div>
+            <div class="bill-actions" style="margin-top: 20px; justify-content: center;">
+                <button class="btn copy-bill" onclick="copyBillDetailsToClipboard()">📋 Copy Bill Details</button>
+                <button class="btn instagram" onclick="window.open('https://www.instagram.com/' + (INSTAGRAM_USERNAME || ''), '_blank'); closeModal('instagramShareModal');">Go to Instagram <i class="fab fa-instagram"></i></button>
+            </div>
+            <div id="instagramShareMessage" class="success" style="display:none;"></div>
+        </div>
+    </div>
+
+    <div id="confirmationModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" onclick="closeModal('confirmationModal')">&times;</span>
+            <h2>Confirm Action</h2>
+            <p id="confirmationMessage">Are you sure?</p>
+            <div style="display: flex; justify-content: center; gap: 15px; margin-top: 25px;">
+                <button class="btn delete-bill" id="confirmActionBtn">Yes, Proceed</button>
+                <button class="btn secondary" onclick="closeModal('confirmationModal')">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Voucher Management Modal -->
+    <div id="voucherManagementModal" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <span class="close-button" onclick="closeModal('voucherManagementModal')">&times;</span>
+            <h2><i class="fas fa-tags"></i> Manage Vouchers</h2>
+
+            <div id="voucherFormContainer" style="background-color: #f8f9fa; padding: 20px; border-radius: var(--border-radius-medium); margin-bottom: 20px;">
+                <h3 id="voucherFormTitle" style="text-align: center; margin-bottom: 20px; color: var(--dark-text);">Add New Voucher</h3>
+                <form id="voucherForm">
+                    <input type="hidden" id="voucherId">
+                    <div class="form-group">
+                        <label for="voucherSerialNumber">Serial Number</label>
+                        <input type="number" id="voucherSerialNumber" placeholder="e.g., 1122" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="voucherDescription">Description</label>
+                        <input type="text" id="voucherDescription" placeholder="e.g., Buy 1 Get 1 Free" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="voucherImageUrl">Image URL</label>
+                        <input type="url" id="voucherImageUrl" placeholder="https://example.com/image.png" required>
+                    </div>
+                    <button type="submit" class="btn btn-full"><i class="fas fa-save"></i> Save Voucher</button>
+                    <button type="button" class="btn secondary btn-full" onclick="resetVoucherForm()" style="margin-top: 10px;">Cancel Edit</button>
+                </form>
+                <div id="voucherFormMessage" class="success" style="display:none; margin-top: 15px;"></div>
+            </div>
+            
+            <h3 style="text-align: center; margin-bottom: 10px; color: var(--dark-text);">Existing Vouchers</h3>
+            <div id="voucherListContainer" style="max-height: 300px; overflow-y: auto;">
+                <!-- Vouchers will be listed here dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Assign Voucher Modal -->
+    <div id="assignVoucherModal" class="modal">
+        <div class="modal-content" style="max-width: 700px;">
+            <span class="close-button" onclick="closeModal('assignVoucherModal')">&times;</span>
+            <h2><i class="fas fa-gift"></i> Assign a Voucher to Bill</h2>
+            <p>Select a voucher from the list below to permanently assign it to the selected bill. This will overwrite any existing voucher.</p>
+            <div id="assignVoucherListContainer" style="max-height: 400px; overflow-y: auto; margin-top: 20px; border: 1px solid #eee; border-radius: var(--border-radius-medium);">
+                <!-- Vouchers will be listed here dynamically -->
+            </div>
+            <div id="assignVoucherMessage" style="margin-top: 15px;"></div>
+        </div>
+    </div>
+
+
+    <script>
+        // Firebase Configuration
+  const firebaseConfig = {
+  apiKey: "AIzaSyCjx0UgwFsQHFhDChLYjb8HYs0YYHFiwn4",
+  authDomain: "accords-gamming.firebaseapp.com",
+  projectId: "accords-gamming",
+  storageBucket: "accords-gamming.appspot.com",
+  messagingSenderId: "578865144674",
+  appId: "1:578865144674:web:040af4f1ea8dccda53023b",
+  measurementId: "G-ZKZ6FWHFJE"
+};
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        let currentUser = null;
+        let currentUserRole = 'staff'; // Default role
+        let currentBillId = null; 
+        let currentBillData = null;
+        let actionToConfirm = null; // For the confirmation modal
+
+        let cycleInterval = null;
+
+        // --- GLOBAL VARIABLES ---
+        const INSTAGRAM_USERNAME = "sai.dasari1225"; 
+        const BILL_ITEM_PLACEHOLDER_IMAGE_URL = "https://placehold.co/80x80/FF69B4/FFFFFF?text=Bill";
+        let voucherDefinitions = []; // Will be populated from Firestore
+        let voucherSequence = []; // Maintain the sequence of vouchers
+        let voucherSequenceIndex = 0; // Current position in sequence
+
+        // --- VOUCHER MANAGEMENT ---
+        
+        /**
+         * One-time function to populate Firestore with default vouchers if the collection is empty.
+         */
+        async function seedInitialVouchers() {
+            const initialVouchers = [
+                { serialNumber: 1110, description: "Buy 1 get 1 upto 100 rs", imageUrl: "https://tinyurl.com/36edw4cd" },
+                { serialNumber: 1111, description: "1 large popcorn", imageUrl: "https://tinyurl.com/4jym6p92" },
+                { serialNumber: 1112, description: "1 small popcorn", imageUrl: "https://tinyurl.com/ypydkzn4" },
+                { serialNumber: 1113, description: "20rs", imageUrl: "https://tinyurl.com/stswf28n" },
+                { serialNumber: 1114, description: "50rs", imageUrl: "https://tinyurl.com/37u3rz3d" },
+                { serialNumber: 1115, description: "100rs", imageUrl: "https://tinyurl.com/36edw4cd" },
+                { serialNumber: 1116, description: "Spend 200 get 100 rs voucher", imageUrl: "https://tinyurl.com/4327x63e" },
+                { serialNumber: 1117, description: "Spend 300rs get 200rs voucher", imageUrl: "https://tinyurl.com/uy6kbbmn" },
+                { serialNumber: 1118, description: "1 large pepsi", imageUrl: "https://tinyurl.com/2y3m5s5n" },
+                { serialNumber: 1119, description: "1 small pepsi", imageUrl: "https://tinyurl.com/4s3n2bjd" },
+                { serialNumber: 1120, description: "combo 1 pepsi + 1 popcorn (small)", imageUrl: "https://tinyurl.com/2mzjsaxz" },
+                { serialNumber: 1121, description: "combo 1 pepsi + 1 popcorn (large)", imageUrl: "https://tinyurl.com/29x2896d" }
+            ];
+
+            const vouchersRef = db.collection('vouchers');
+            const snapshot = await vouchersRef.limit(1).get();
+
+            if (snapshot.empty) {
+                console.log("No vouchers found in Firestore. Seeding initial data...");
+                const batch = db.batch();
+                initialVouchers.forEach(voucher => {
+                    const docRef = vouchersRef.doc(); // Auto-generate ID
+                    batch.set(docRef, voucher);
+                });
+                await batch.commit();
+                console.log("Initial vouchers seeded successfully.");
+            }
+        }
+
+        /**
+         * Loads vouchers from Firestore and sets up a real-time listener.
+         */
+        function loadVouchersFromFirestore() {
+            const vouchersRef = db.collection('vouchers').orderBy('serialNumber');
+            
+            vouchersRef.onSnapshot(snapshot => {
+                voucherDefinitions = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                console.log("Vouchers updated from Firestore:", voucherDefinitions);
+                renderVoucherManagementList(); // Update the management modal list
+                refreshBillLists(); // Redraw bills to update voucher dropdowns
+            }, error => {
+                console.error("Error fetching vouchers:", error);
+                showError('adminPanelMessage', 'Could not load vouchers.');
+            });
+        }
+
+        /**
+         * Renders the list of vouchers in the management modal.
+         */
+        function renderVoucherManagementList() {
+            const container = document.getElementById('voucherListContainer');
+            if (!container) return;
+            container.innerHTML = ''; // Clear existing list
+            
+            if (voucherDefinitions.length === 0) {
+                container.innerHTML = '<p style="text-align: center; padding: 20px;">No vouchers found. Add one using the form above.</p>';
+                return;
+            }
+
+            voucherDefinitions.forEach(voucher => {
+                const div = document.createElement('div');
+                div.className = 'voucher-item-admin';
+                div.innerHTML = `
+                    <div class="voucher-item-admin-info">
+                        <img src="${voucher.imageUrl}" alt="Voucher" onerror="this.src='https://placehold.co/50x50/cccccc/FFFFFF?text=X'">
+                        <div>
+                            <strong>#${voucher.serialNumber}</strong>
+                            <p>${voucher.description}</p>
+                        </div>
+                    </div>
+                    <div class="voucher-item-admin-actions">
+                        <button class="btn secondary" onclick="editVoucher('${voucher.id}')"><i class="fas fa-edit"></i></button>
+                        <button class="btn delete-bill" onclick="confirmDeleteVoucher('${voucher.id}')"><i class="fas fa-trash"></i></button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        /**
+         * Opens the voucher form for editing.
+         */
+        function editVoucher(voucherId) {
+            const voucher = voucherDefinitions.find(v => v.id === voucherId);
+            if (!voucher) return;
+
+            document.getElementById('voucherFormTitle').textContent = 'Edit Voucher';
+            document.getElementById('voucherId').value = voucher.id;
+            document.getElementById('voucherSerialNumber').value = voucher.serialNumber;
+            document.getElementById('voucherDescription').value = voucher.description;
+            document.getElementById('voucherImageUrl').value = voucher.imageUrl;
+            document.getElementById('voucherSerialNumber').readOnly = true; // Prevent editing serial number
+        }
+
+        /**
+         * Resets the voucher form to its default "add new" state.
+         */
+        function resetVoucherForm() {
+            document.getElementById('voucherFormTitle').textContent = 'Add New Voucher';
+            document.getElementById('voucherForm').reset();
+            document.getElementById('voucherId').value = '';
+            document.getElementById('voucherSerialNumber').readOnly = false;
+        }
+
+        /**
+         * Handles the submission of the voucher form (add or edit).
+         */
+        document.getElementById('voucherForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const voucherId = document.getElementById('voucherId').value;
+            const serialNumber = parseInt(document.getElementById('voucherSerialNumber').value, 10);
+            const description = document.getElementById('voucherDescription').value;
+            const imageUrl = document.getElementById('voucherImageUrl').value;
+
+            if (isNaN(serialNumber)) {
+                showError('voucherFormMessage', 'Serial number must be a number.');
+                return;
+            }
+            
+            // Check if serial number already exists when adding a new one
+            if (!voucherId && voucherDefinitions.some(v => v.serialNumber === serialNumber)) {
+                showError('voucherFormMessage', 'This serial number is already in use.');
+                return;
+            }
+
+            const voucherData = { serialNumber, description, imageUrl };
+            const formMessageEl = document.getElementById('voucherFormMessage');
+            
+            try {
+                if (voucherId) {
+                    // Update existing voucher
+                    await db.collection('vouchers').doc(voucherId).update(voucherData);
+                    showSuccess('voucherFormMessage', 'Voucher updated successfully!');
+                } else {
+                    // Add new voucher
+                    await db.collection('vouchers').add(voucherData);
+                    showSuccess('voucherFormMessage', 'Voucher added successfully!');
+                }
+                resetVoucherForm();
+            } catch (error) {
+                console.error("Error saving voucher: ", error);
+                showError('voucherFormMessage', 'Failed to save voucher.');
+            }
+        });
+
+        /**
+         * Shows confirmation modal before deleting a voucher.
+         */
+        function confirmDeleteVoucher(voucherId) {
+            const voucher = voucherDefinitions.find(v => v.id === voucherId);
+            if (!voucher) return;
+            
+            document.getElementById('confirmationMessage').textContent = `Are you sure you want to delete the voucher #${voucher.serialNumber} (${voucher.description})? This cannot be undone.`;
+            document.getElementById('confirmActionBtn').textContent = "Yes, Delete Voucher";
+            actionToConfirm = () => deleteVoucher(voucherId);
+            openModal('confirmationModal');
+        }
+
+        /**
+         * Deletes a voucher from Firestore.
+         */
+        async function deleteVoucher(voucherId) {
+            try {
+                await db.collection('vouchers').doc(voucherId).delete();
+                showSuccess('adminPanelMessage', 'Voucher deleted successfully.');
+                closeModal('confirmationModal');
+            } catch (error) {
+                console.error("Error deleting voucher: ", error);
+                showError('adminPanelMessage', 'Failed to delete voucher.');
+            }
+            actionToConfirm = null;
+        }
+
+
+        function getVoucherBySerial(serialNumber) {
+            // Now searches the dynamically loaded array
+            return voucherDefinitions.find(v => v.serialNumber === serialNumber);
+        }
+
+        // FIXED: Voucher sequence management
+        async function getNextVoucherInSequence() {
+            // Load sequence if empty
+            if (voucherSequence.length === 0) {
+                await loadVoucherSequence();
+            }
+            
+            if (voucherSequence.length === 0) return null;
+            
+            // Get next voucher
+            const serialNumber = voucherSequence[voucherSequenceIndex];
+            const voucher = getVoucherBySerial(serialNumber);
+            
+            // Update index for next call
+            voucherSequenceIndex = (voucherSequenceIndex + 1) % voucherSequence.length;
+            await saveVoucherSequence();
+            
+            return voucher;
+        }
+
+        // FIXED: Load voucher sequence
+        async function loadVoucherSequence() {
+            try {
+                const sequenceDoc = await db.collection('appSettings').doc('voucherSequence').get();
+                if (sequenceDoc.exists) {
+                    voucherSequence = sequenceDoc.data().sequence || [];
+                    voucherSequenceIndex = sequenceDoc.data().index || 0;
+                } else {
+                    // Initialize sequence with all serial numbers
+                    voucherSequence = voucherDefinitions.map(v => v.serialNumber);
+                    voucherSequenceIndex = 0;
+                    await saveVoucherSequence();
+                }
+            } catch (error) {
+                console.error("Error loading voucher sequence:", error);
+                voucherSequence = voucherDefinitions.map(v => v.serialNumber);
+                voucherSequenceIndex = 0;
+            }
+        }
+
+        // FIXED: Save voucher sequence
+        async function saveVoucherSequence() {
+            try {
+                await db.collection('appSettings').doc('voucherSequence').set({
+                    sequence: voucherSequence,
+                    index: voucherSequenceIndex
+                }, { merge: true });
+            } catch (error) {
+                console.error("Error saving voucher sequence:", error);
+            }
+        }
+
+        // --- Voucher Assignment to Existing Bill ---
+
+        /**
+         * Opens a modal to select a voucher for assigning to an existing bill.
+         * @param {string} billDocId - The Firestore document ID of the bill.
+         */
+        function openAssignVoucherModal(billDocId) {
+            const container = document.getElementById('assignVoucherListContainer');
+            container.innerHTML = ''; // Clear previous list
+
+            if (voucherDefinitions.length === 0) {
+                container.innerHTML = '<p style="text-align: center; padding: 20px;">No vouchers available to assign.</p>';
+            } else {
+                voucherDefinitions.forEach(voucher => {
+                    const div = document.createElement('div');
+                    div.className = 'voucher-item-admin';
+                    div.innerHTML = `
+                        <div class="voucher-item-admin-info">
+                            <img src="${voucher.imageUrl}" alt="Voucher" onerror="this.src='https://placehold.co/50x50/cccccc/FFFFFF?text=X'">
+                            <div>
+                                <strong>#${voucher.serialNumber}</strong>
+                                <p>${voucher.description}</p>
+                            </div>
+                        </div>
+                        <div class="voucher-item-admin-actions">
+                             <button class="btn btn-green" onclick="confirmAssignVoucher('${billDocId}', '${voucher.id}')">Assign</button>
+                        </div>
+                    `;
+                    container.appendChild(div);
+                });
+            }
+            document.getElementById('assignVoucherMessage').style.display = 'none';
+            openModal('assignVoucherModal');
+        }
+
+        /**
+         * Shows a confirmation dialog before assigning the voucher.
+         * @param {string} billDocId - The Firestore document ID of the bill.
+         * @param {string} voucherId - The Firestore document ID of the voucher.
+         */
+        function confirmAssignVoucher(billDocId, voucherId) {
+            const voucher = voucherDefinitions.find(v => v.id === voucherId);
+            if (!voucher) return;
+            
+            document.getElementById('confirmationMessage').textContent = `Are you sure you want to assign the voucher "${voucher.description}" to this bill? This will overwrite any existing voucher on the bill.`;
+            document.getElementById('confirmActionBtn').textContent = "Yes, Assign Voucher";
+            actionToConfirm = () => assignVoucherToBill(billDocId, voucherId);
+            openModal('confirmationModal');
+        }
+
+        /**
+         * Updates the bill document in Firestore with the selected voucher.
+         * @param {string} billDocId - The Firestore document ID of the bill.
+         * @param {string} voucherId - The Firestore document ID of the voucher.
+         */
+        async function assignVoucherToBill(billDocId, voucherId) {
+            const voucher = voucherDefinitions.find(v => v.id === voucherId);
+            if (!voucher) {
+                displayMessage('assignVoucherMessage', 'Selected voucher not found.', true, true);
+                return;
+            }
+
+            try {
+                await db.collection('bills').doc(billDocId).update({
+                    assignedVoucher: {
+                        serialNumber: voucher.serialNumber,
+                        description: voucher.description,
+                        imageUrl: voucher.imageUrl
+                    }
+                });
+                
+                showSuccess('adminPanelMessage', 'Voucher assigned successfully!');
+                refreshBillLists();
+                closeModal('assignVoucherModal');
+                closeModal('confirmationModal');
+            } catch (error) {
+                console.error("Error assigning voucher:", error);
+                displayMessage('assignVoucherMessage', 'Failed to assign voucher: ' + error.message, true, true);
+            }
+            actionToConfirm = null; 
+        }
+
+        // --- Auth Tab Switching ---
+        function switchAuthTab(tab) {
+            const loginTab = document.querySelector('.auth-tab:first-child');
+            const registerTab = document.querySelector('.auth-tab:last-child');
+            const loginForm = document.getElementById('loginForm');
+            const registerForm = document.getElementById('registerForm');
+            
+            if (tab === 'login') {
+                loginTab.classList.add('active');
+                registerTab.classList.remove('active');
+                loginForm.classList.add('active');
+                registerForm.classList.remove('active');
+            } else {
+                registerTab.classList.add('active');
+                loginTab.classList.remove('active');
+                registerForm.classList.add('active');
+                loginForm.classList.remove('active');
+            }
+            document.getElementById('loginError').style.display = 'none';
+            document.getElementById('registerError').style.display = 'none';
+            document.getElementById('registerSuccess').style.display = 'none';
+        }
+
+        // --- Authentication ---
+        document.getElementById('loginFormElement').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            try {
+                await auth.signInWithEmailAndPassword(email, password);
+            } catch (error) {
+                showError('loginError', error.message);
+            }
+        });
+
+        document.getElementById('registerFormElement').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('registerName').value;
+            const email = document.getElementById('registerEmail').value;
+            const password = document.getElementById('registerPassword').value;
+            
+            try {
+                const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+                await db.collection('users').doc(userCredential.user.uid).set({
+                    name: name,
+                    email: email,
+                    role: 'staff', 
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                showSuccess('registerSuccess', 'Account created successfully! You can now sign in.');
+                document.getElementById('registerFormElement').reset();
+                setTimeout(() => switchAuthTab('login'), 2000);
+            } catch (error) {
+                showError('registerError', error.message);
+            }
+        });
+
+        // --- Admin Authentication (Modal) ---
+        function showAdminLogin() {
+            openModal('adminLoginModal');
+            document.getElementById('adminLoginError').style.display = 'none';
+            document.getElementById('adminLoginFormElement').reset();
+        }
+
+        document.getElementById('adminLoginFormElement').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('adminLoginEmail').value;
+            const password = document.getElementById('adminLoginPassword').value;
+
+            try {
+                const tempAuth = firebase.app().auth(); 
+                const userCredential = await tempAuth.signInWithEmailAndPassword(email, password);
+                const adminUser = userCredential.user;
+
+                const userDoc = await db.collection('users').doc(adminUser.uid).get();
+                if (userDoc.exists && userDoc.data().role === 'admin') {
+                    currentUser = adminUser; 
+                    currentUserRole = 'admin';
+                    document.getElementById('userName').textContent = userDoc.data().name; 
+                    
+                    closeModal('adminLoginModal');
+                    showPage('admin'); 
+                } else {
+                    showError('adminLoginError', 'Access Denied: Not an admin or invalid credentials.');
+                }
+            } catch (error) {
+                showError('adminLoginError', error.message);
+            }
+        });
+        
+        async function shortenUrl(longUrl) {
+          try {
+            const response = await fetch(`https://api.tinyurl.com/create`, {
+              method: 'POST',
+              headers: {
+                'Authorization': 'Bearer FjS7X4lmBPjYxvDJNvz6hExDeQUyXIPrxBf2ibyAWV1dPI7wLiucXvsvKl07',
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ url: longUrl, domain: 'tinyurl.com' })
+            });
+            const data = await response.json();
+            if (data.data && data.data.tiny_url) {
+              return data.data.tiny_url;
+            } else {
+              return longUrl;
+            }
+          } catch (err) {
+            console.error("Shorten URL Failed:", err);
+            return longUrl;
+          }
+        }
+
+        // UPDATED: generateBillContent now accepts billDocId
+        async function generateBillContent(billData, billDocId) {
+            const timeInDate = new Date(billData.timeIn);
+            const timeOutDate = new Date(billData.timeOut);
+            const timeInFormatted = timeInDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+            const timeOutFormatted = timeOutDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+            const dateFormatted = timeInDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+
+            const durationMs = timeOutDate.getTime() - timeInDate.getTime();
+            const totalMinutes = Math.floor(durationMs / (1000 * 60));
+            const hours = Math.floor(totalMinutes / 60);
+            const minutes = totalMinutes % 60;
+            let durationString = '';
+            if (hours > 0) {
+                durationString += `${hours} Hour${hours > 1 ? 's' : ''}`;
+            }
+            if (minutes > 0) {
+                durationString += `${hours > 0 ? ' ' : ''}${minutes} Minute${minutes > 1 ? 's' : ''}`;
+            }
+            if (durationString === '') {
+                durationString = 'Less than a minute';
+            }
+
+            let message = `🎮 GAME ZONE | MISSION COMPLETE!\n`; 
+            message += `🧾 Bill Code: ${billData.publicCode || 'N/A'}\n`;
+            message += `👤 Player: ${billData.customerName}\n`;
+            message += `📞 ${billData.customerContactInfo || 'N/A'}\n\n`;
+            message += `🎟️ ${billData.numberOfPeople} Player${billData.numberOfPeople > 1 ? 's' : ''} | ${durationString} of Fun\n`;
+            message += `🕒 In: ${dateFormatted}, ${timeInFormatted}\n`;
+            message += `🕔 Out: ${timeOutFormatted}\n`;
+            message += `💰 Paid: ₹${billData.amount.toFixed(2)}\n`;
+
+            if (billData.assignedVoucher) {
+                const rawTrackingUrl = `https://accords-gamming.web.app/Redirecting.html?url=${encodeURIComponent(billData.assignedVoucher.imageUrl)}&name=${encodeURIComponent(billData.customerName)}&phone=${encodeURIComponent(billData.customerContactInfo)}&billId=${billDocId}&desc=${encodeURIComponent(billData.assignedVoucher.description)}`;
+                const shortUrl = await shortenUrl(rawTrackingUrl);
+                message += `\n🎁 Claim your voucher 👇\n${shortUrl}\n`;
+            }
+
+            message += `\nThank you for choosing Game Zone!`;
+            return message;
+        }
+
+        function isValidPhoneNumber(contact) {
+            return contact && /^\+?[0-9]{7,15}$/.test(contact.replace(/\s/g, ''));
+        }
+
+        // --- Voucher Toggle Functions (Manual) ---
+        async function getVoucherToggleState() {
+            try {
+                const docRef = db.collection('appSettings').doc('global');
+                const docSnap = await docRef.get();
+                if (docSnap.exists) {
+                    return docSnap.data().voucherGenerationEnabled || false;
+                }
+                return false;
+            } catch (error) {
+                console.error("Error fetching voucher toggle state:", error);
+                return false;
+            }
+        }
+
+        async function setVoucherToggleState(isEnabled, showMessage = true) {
+             try {
+                await db.collection('appSettings').doc('global').set({ voucherGenerationEnabled: isEnabled }, { merge: true });
+                if (showMessage) {
+                    showSuccess('adminPanelMessage', `Manual voucher generation ${isEnabled ? 'enabled' : 'disabled'}.`);
+                }
+            } catch (error) {
+                showError('adminPanelMessage', 'Failed to update voucher toggle state: ' + error.message);
+            }
+        }
+        
+        // --- Bill Sharing Functions ---
+        // UPDATED: sendWhatsAppBill now passes the billDocId to generateBillContent
+        async function sendWhatsAppBill(billDocId, customMessage = null) { 
+            let billData;
+            try {
+                const billDoc = await db.collection('bills').doc(billDocId).get();
+                if (!billDoc.exists) {
+                    showErrorInModal('billDetailsMessage', 'Bill not found.'); return false;
+                }
+                billData = { id: billDoc.id, ...billDoc.data() };
+                currentBillId = billDocId; 
+                currentBillData = billData;
+            } catch (error) {
+                showErrorInModal('billDetailsMessage', 'Failed to retrieve bill.'); return false;
+            }
+
+            // FIXED: Pass the billDocId to generate the correct tracking URL
+            const messageToSend = customMessage || await generateBillContent(billData, billDocId);
+            const contactInfo = billData.customerContactInfo;
+            let whatsappSent = false;
+
+            if (isValidPhoneNumber(contactInfo)) {
+                const encodedMessage = encodeURIComponent(messageToSend);
+                const whatsappUrl = `https://wa.me/${contactInfo.replace(/[^+\d]/g, '')}?text=${encodedMessage}`;
+                window.open(whatsappUrl, '_blank');
+                whatsappSent = true;
+                showSuccessInModal('billDetailsMessage', 'Bill sent via WhatsApp!');
+            } else {
+                showErrorInModal('billDetailsMessage', `No valid WhatsApp number. Please use Instagram or mark as manually shared.`);
+            }
+
+            await db.collection('bills').doc(billDocId).update({
+                'shareStatus.whatsapp': whatsappSent,
+                'shareStatus.lastAttempt': firebase.firestore.FieldValue.serverTimestamp()
+            }).catch(err => console.error("Error updating WhatsApp share status:", err));
+            
+            refreshBillLists();
+            return whatsappSent;
+        }
+
+        // UPDATED: prepareInstagramShare now passes the billDocId to generateBillContent
+        async function prepareInstagramShare(billDocId) { 
+            let billData;
+            try {
+                const billDoc = await db.collection('bills').doc(billDocId).get();
+                 if (!billDoc.exists) {
+                    showErrorInModal('billDetailsMessage', 'Bill not found.'); return;
+                }
+                billData = { id: billDoc.id, ...billDoc.data() };
+                currentBillId = billDocId; 
+                currentBillData = billData;
+            } catch (error) {
+                showErrorInModal('billDetailsMessage', 'Failed to retrieve bill.'); return;
+            }
+
+            // FIXED: Pass the billDocId to generate the correct tracking URL
+            const billContent = await generateBillContent(billData, billDocId); 
+            document.getElementById('instagramBillPreview').textContent = billContent;
+            document.getElementById('instagramShareMessage').style.display = 'none';
+            openModal('instagramShareModal');
+
+            await db.collection('bills').doc(billDocId).update({
+                'shareStatus.instagram': true, 
+                'shareStatus.lastAttempt': firebase.firestore.FieldValue.serverTimestamp()
+            }).catch(err => console.error("Error updating Instagram share status:", err));
+            refreshBillLists();
+        }
+        
+        // UPDATED: prepareVoucherForInstagramShare now includes billId and description in the URL
+        async function prepareVoucherForInstagramShare(billDocId, voucherSerialNumber) { 
+             let billData;
+            try {
+                const billDoc = await db.collection('bills').doc(billDocId).get();
+                if (!billDoc.exists) {
+                    showErrorInModal('billDetailsMessage', 'Bill not found.'); return;
+                }
+                 billData = { id: billDoc.id, ...billDoc.data() };
+                currentBillId = billDocId; 
+                currentBillData = billData;
+            } catch (error) {
+                showErrorInModal('billDetailsMessage', 'Failed to retrieve bill.'); return;
+            }
+
+            const voucher = getVoucherBySerial(voucherSerialNumber);
+            if (!voucher) {
+                showErrorInModal('billDetailsMessage', 'Voucher details not found.'); return;
+            }
+            
+            // FIXED: Added billId and voucher description to the tracking URL
+            const rawTrackingUrl = `https://accords-gamming.web.app/Redirecting.html?url=${encodeURIComponent(voucher.imageUrl)}&name=${encodeURIComponent(billData.customerName)}&phone=${encodeURIComponent(billData.customerContactInfo)}&billId=${billDocId}&desc=${encodeURIComponent(voucher.description)}`;
+            const shortUrl = await shortenUrl(rawTrackingUrl);
+
+            const voucherMessage = `🎁 *Game Zone Voucher* 🎁\n\n` +
+                                   `Dear ${billData.customerName},\n\n` +
+                                   `Here's your special voucher: ${voucher.description}.\n\n` +
+                                   `View your voucher image here: ${shortUrl}\n\n` +
+                                   `_Please copy this message and paste it into an Instagram message._\n\n` +
+                                   `Thank you for choosing Game Zone!`;
+
+            document.getElementById('instagramBillPreview').textContent = voucherMessage; 
+            document.getElementById('instagramShareMessage').style.display = 'none';
+            openModal('instagramShareModal');
+
+            await db.collection('bills').doc(billDocId).update({
+                'shareStatus.instagramVoucher': true,
+                'shareStatus.lastAttempt': firebase.firestore.FieldValue.serverTimestamp()
+            }).catch(err => console.error("Error updating Instagram voucher share status:", err));
+            refreshBillLists();
+        }
+
+        function copyBillDetailsToClipboard() {
+            const billContent = document.getElementById('instagramBillPreview').textContent;
+            navigator.clipboard.writeText(billContent).then(() => {
+                showSuccess('instagramShareMessage', 'Bill details copied to clipboard!');
+            }).catch(err => {
+                showError('instagramShareMessage', 'Failed to copy. Please copy manually.');
+            });
+        }
+
+        async function markBillAsManuallyShared() {
+            if (!currentBillId) { showErrorInModal('billDetailsMessage', 'No bill selected.'); return; }
+            try {
+                await db.collection('bills').doc(currentBillId).update({
+                    'shareStatus.manuallyShared': true,
+                    'shareStatus.lastAttempt': firebase.firestore.FieldValue.serverTimestamp()
+                });
+                showSuccessInModal('billDetailsMessage', 'Bill marked as manually shared!');
+                refreshBillLists();
+            }
+            catch (error) {
+                showErrorInModal('billDetailsMessage', 'Failed to mark as manually shared.');
+            }
+        }
+        
+        // UPDATED: sendVoucherWithDiscount now includes billId and description in the URL
+        async function sendVoucherWithDiscount(billDocId, voucherSerialNumber) { 
+            if (!billDocId) { showErrorInModal('billDetailsMessage', 'Please select a bill.'); return; }
+            let billData;
+            try {
+                const billDoc = await db.collection('bills').doc(billDocId).get();
+                 if (!billDoc.exists) { showErrorInModal('billDetailsMessage', 'Bill not found.'); return; }
+                billData = { id: billDoc.id, ...billDoc.data() };
+                currentBillId = billDocId; currentBillData = billData;
+            } catch (error) {
+                showErrorInModal('billDetailsMessage', 'Failed to retrieve bill.'); return;
+            }
+            
+            const voucher = getVoucherBySerial(voucherSerialNumber);
+            if (!voucher) {
+                showErrorInModal('billDetailsMessage', 'Voucher details not found.');
+                return;
+            }
+            
+            // FIXED: Added billId and voucher description to the tracking URL
+            const trackingUrl = `https://accords-gamming.web.app/Redirecting.html?url=${encodeURIComponent(voucher.imageUrl)}&name=${encodeURIComponent(billData.customerName)}&phone=${encodeURIComponent(billData.customerContactInfo)}&billId=${billDocId}&desc=${encodeURIComponent(voucher.description)}`;
+            const shortUrl = await shortenUrl(trackingUrl);
+
+            const message = `🎮 *Game Zone Voucher* 🎁\n\n` +
+                           `Dear ${billData.customerName},\n\n` +
+                           `Here's your special voucher: ${voucher.description}.\n\n` +
+                           `View your voucher: ${shortUrl}\n\n` +
+                           `Thank you for choosing Game Zone!`;
+
+            const sent = await sendWhatsAppBill(billDocId, message);
+            if (sent) {
+                // Update voucher status
+                await db.collection('bills').doc(billDocId).update({
+                    'shareStatus.whatsappVoucher': true,
+                    'shareStatus.lastAttempt': firebase.firestore.FieldValue.serverTimestamp()
+                });
+            }
+        }
+        
+        // --- Bill Management ---
+        async function getNextBillSerialNumber() {
+            try {
+                const billsRef = db.collection("bills");
+                const snapshot = await billsRef.orderBy("serialNumber", "desc").limit(1).get();
+                if (snapshot.empty) {
+                    return 1; // First bill
+                }
+                const lastBill = snapshot.docs[0].data();
+                return (lastBill.serialNumber || 0) + 1;
+            } catch (error) {
+                console.error("Error getting next bill serial number:", error);
+                return 1; // Fallback to 1
+            }
+        }
+
+        function generatePublicCode(length = 10) {
+            const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+            let result = '';
+            for (let i = 0; i < length; i++) {
+                result += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return result;
+        }
+
+        document.getElementById('billForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!currentUser) { showError('billError', 'Please sign in.'); return; }
+
+            try {
+                const voucherGenerationEnabled = await getVoucherToggleState();
+                let assignedVoucher = null;
+                
+                const billSequentialSerialNumber = await getNextBillSerialNumber();
+
+                if (voucherGenerationEnabled) {
+                    const nextVoucher = await getNextVoucherInSequence();
+                    if (nextVoucher) {
+                        assignedVoucher = {
+                            serialNumber: nextVoucher.serialNumber,
+                            description: nextVoucher.description,
+                            imageUrl: nextVoucher.imageUrl
+                        };
+                    }
+                } 
+
+                // CORRECTED LOGIC: Create the document first to get the ID
+                const newBillRef = db.collection('bills').doc();
+                const newBillId = newBillRef.id;
+
+                const billData = {
+                    id: newBillId, // Store the ID within the document itself
+                    serialNumber: billSequentialSerialNumber,
+                    publicCode: generatePublicCode(),
+                    customerName: document.getElementById('customerName').value,
+                    customerContactInfo: document.getElementById('customerContact').value,
+                    numberOfPeople: parseInt(document.getElementById('numberOfPeople').value),
+                    entryId: document.getElementById('entryId').value || null,
+                    timeIn: document.getElementById('timeIn').value,
+                    timeOut: document.getElementById('timeOut').value,
+                    amount: parseFloat(document.getElementById('amount').value),
+                    remarks: document.getElementById('remarks').value || null,
+                    createdBy: currentUser.uid,
+                    createdByName: currentUser.displayName || currentUser.email, 
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    date: new Date().toISOString().split('T')[0],
+                    shareStatus: { whatsapp: false, instagram: false, manuallyShared: false, instagramVoucher: false, lastAttempt: null }
+                };
+
+                if (assignedVoucher) {
+                    billData.assignedVoucher = assignedVoucher;
+                }
+                
+                // Now, set the data for the document with the known ID
+                await newBillRef.set(billData);
+
+                showSuccess('billSuccess', `Bill (Serial: ${billData.serialNumber}) created! ${assignedVoucher ? `Voucher Assigned: ${assignedVoucher.description}` : ''}`);
+                clearForm();
+                loadStats();
+                showSection('history'); 
+
+            } catch (error) {
+                showError('billError', error.message);
+                console.error("Error creating bill: ", error);
+            }
+        });
+
+
+        function confirmDeleteBill(billDocId) {
+            document.getElementById('confirmationMessage').textContent = 'Are you sure you want to delete this bill? This action cannot be undone.';
+            document.getElementById('confirmActionBtn').textContent = "Yes, Delete Bill";
+            actionToConfirm = () => deleteBill(billDocId);
+            openModal('confirmationModal');
+        }
+
+        async function deleteBill(billDocId) {
+            if (!currentUser || currentUserRole !== 'admin') {
+                showErrorInModal('billDetailsMessage', 'Only admins can delete bills.'); 
+                return;
+            }
+            try {
+                await db.collection('bills').doc(billDocId).delete();
+                showSuccessInModal('billDetailsMessage', 'Bill deleted successfully!'); 
+                closeModal('confirmationModal');
+                closeModal('billDetailsModal');
+                refreshBillLists();
+                loadStats();
+            } catch (error) {
+                showErrorInModal('billDetailsMessage', 'Failed to delete bill: ' + error.message);
+            }
+            actionToConfirm = null;
+        }
+
+        document.getElementById('confirmActionBtn').addEventListener('click', () => {
+            if (typeof actionToConfirm === 'function') {
+                actionToConfirm();
+            }
+        });
+
+        // --- Search Functionality ---
+        document.getElementById('searchBills').addEventListener('input', (e) => filterBills(e.target.value, '#billsList .bill-item', 'noBillsMessage'));
+        document.getElementById('adminSearchBills').addEventListener('input', (e) => filterBills(e.target.value, '#adminBillsList .admin-bill-item', 'noAdminBillsMessage'));
+
+        function filterBills(searchTerm, itemSelector, noResultsMsgId) {
+            const term = searchTerm.toLowerCase();
+            const bills = document.querySelectorAll(itemSelector);
+            let found = false;
+            bills.forEach(bill => {
+                const display = bill.textContent.toLowerCase().includes(term) ? 'flex' : 'none'; 
+                bill.style.display = display;
+                if (display === 'flex') found = true;
+            });
+            document.getElementById(noResultsMsgId).style.display = found ? 'none' : 'block';
+        }
+        
+        // --- UI Utility Functions ---
+        function showPage(page) {
+            ['landingPage', 'dashboardPage', 'adminPage'].forEach(p => document.getElementById(p).classList.remove('active'));
+            document.getElementById(page + 'Page').classList.add('active'); 
+            if (page === 'dashboard') showSection('newBill');
+            if (page === 'admin') {
+                initializeAdminPanel();
+            }
+        }
+
+        function showSection(section) {
+            document.getElementById('newBillSection').style.display = section === 'newBill' ? 'block' : 'none';
+            document.getElementById('historySection').style.display = section === 'history' ? 'block' : 'none';
+            if(section === 'history') {
+                 document.getElementById('searchBills').value = ''; 
+                 filterBills('', '#billsList .bill-item', 'noBillsMessage'); 
+                 loadBillHistory();
+            }
+            document.getElementById('noBillsMessage').style.display = 'none';
+        }
+
+        function clearForm() {
+            document.getElementById('billForm').reset();
+            initializeTimeInputs();
+            ['billError', 'billSuccess'].forEach(id => document.getElementById(id).style.display = 'none');
+        }
+
+        function showError(elementId, message) { displayMessage(elementId, message, true); }
+        function showSuccess(elementId, message) { displayMessage(elementId, message, false); }
+        function showErrorInModal(elementId, message) { displayMessage(elementId, message, true, true); }
+        function showSuccessInModal(elementId, message) { displayMessage(elementId, message, false, true); }
+
+
+        function displayMessage(elementId, message, isError, isModal = false) {
+            const el = document.getElementById(elementId);
+            if (!el) { console.error(`Element ${elementId} not found for message: ${message}`); return; }
+            el.textContent = message;
+            el.className = isError ? 'error' : 'success'; 
+            el.style.display = 'block';
+            if (!isModal) {
+                setTimeout(() => el.style.display = 'none', isError ? 5000 : 3000);
+            }
+        }
+        
+        // --- Data Loading ---
+        async function loadStats() {
+            if (!currentUser) return;
+            try {
+                const today = new Date().toISOString().split('T')[0];
+                const billsSnapshot = await db.collection('bills').where('date', '==', today).get();
+                let todayRevenue = 0;
+                billsSnapshot.forEach(doc => todayRevenue += doc.data().amount || 0);
+                
+                const totalBillsSnapshot = await db.collection('bills').get(); 
+                
+                document.getElementById('todayRevenue').textContent = '₹' + todayRevenue.toFixed(2);
+                document.getElementById('todaySessions').textContent = billsSnapshot.size; 
+                document.getElementById('totalCustomers').textContent = totalBillsSnapshot.size; 
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        function refreshBillLists() {
+            if (document.getElementById('dashboardPage').classList.contains('active') && 
+                document.getElementById('historySection').style.display === 'block') {
+                loadBillHistory();
+            }
+            if (document.getElementById('adminPage').classList.contains('active')) {
+                loadAdminBillHistory();
+            }
+        }
+        
+        async function loadBillHistory() { 
+            if (!currentUser) return;
+            const billsList = document.getElementById('billsList');
+            billsList.innerHTML = ''; 
+            document.getElementById('noBillsMessage').style.display = 'none';
+
+            try {
+                // Fetch bills without ordering from Firestore
+                const billsSnapshot = await db.collection('bills')
+                    .where('createdBy', '==', currentUser.uid)
+                    .limit(150)
+                    .get();
+                
+                let billsData = billsSnapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+                
+                // Sort the data in JavaScript
+                billsData.sort((a, b) => (b.createdAt?.toDate() || 0) - (a.createdAt?.toDate() || 0));
+
+                if (billsData.length === 0) {
+                    document.getElementById('noBillsMessage').style.display = 'block';
+                } else {
+                    billsData.forEach(bill => {
+                        billsList.appendChild(createBillElement(bill.id, bill));
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading dashboard bills:', error);
+                showError('noBillsMessage', 'Could not load bills. ' + error.message); 
+            }
+        }
+
+        async function loadAdminBillHistory() { 
+            if (!currentUser || currentUserRole !== 'admin') return; 
+            const adminBillsList = document.getElementById('adminBillsList');
+            adminBillsList.innerHTML = ''; 
+            document.getElementById('noAdminBillsMessage').style.display = 'none';
+
+            try {
+                // Fetch all bills without ordering from Firestore
+                const billsSnapshot = await db.collection('bills').get(); 
+                let billsData = billsSnapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+                
+                // Sort the data in JavaScript
+                billsData.sort((a, b) => (b.createdAt?.toDate() || 0) - (a.createdAt?.toDate() || 0));
+
+                if (billsData.length === 0) {
+                    document.getElementById('noAdminBillsMessage').style.display = 'block';
+                } else {
+                    billsData.forEach(bill => {
+                        adminBillsList.appendChild(createBillElement(bill.id, bill));
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading admin bills:', error);
+                 showError('noAdminBillsMessage', 'Could not load bills. ' + error.message); 
+            }
+        }
+
+
+        function createBillElement(billDocId, bill) {
+            const div = document.createElement('div');
+            
+            const isAdminOnAdminPage = currentUserRole === 'admin' && document.getElementById('adminPage').classList.contains('active');
+            
+            // Use the check to decide the class for the bill item styling
+            div.className = isAdminOnAdminPage ? 'admin-bill-item' : 'bill-item';
+            
+            const timeInDate = new Date(bill.timeIn);
+            const timeOutDate = new Date(bill.timeOut);
+            
+            const durationMs = timeOutDate.getTime() - timeInDate.getTime();
+            const totalMinutes = Math.floor(durationMs / (1000 * 60));
+            const hours = Math.floor(totalMinutes / 60);
+            const minutes = totalMinutes % 60;
+            let durationString = '';
+            if (hours > 0) durationString += `${hours} Hour${hours > 1 ? 's' : ''}`;
+            if (minutes > 0) durationString += `${hours > 0 ? ' ' : ''}${minutes} Minute${minutes > 1 ? 's' : ''}`;
+            if (durationString === '') durationString = 'Less than a minute';
+
+            const imageUrl = bill.assignedVoucher?.imageUrl || BILL_ITEM_PLACEHOLDER_IMAGE_URL;
+            const imageHtml = `<img src="${imageUrl}" alt="Bill Icon" class="bill-item-image" onerror="this.src='https://placehold.co/80x80/cccccc/FFFFFF?text=Error'; this.alt='Image Missing'">`;
+
+            let shareStatusHtml = '';
+            if (bill.shareStatus) {
+                if (bill.shareStatus.whatsapp) shareStatusHtml = '<p style="color: var(--success-color); margin-top: 5px;"><i class="fas fa-check-circle"></i> Sent (WhatsApp)</p>';
+                else if (bill.shareStatus.instagramVoucher) shareStatusHtml = '<p style="color: var(--success-color); margin-top: 5px;"><i class="fas fa-ticket-alt"></i> Voucher via IG (Attempted)</p>';
+                else if (bill.shareStatus.instagram) shareStatusHtml = '<p style="color: var(--success-color); margin-top: 5px;"><i class="fas fa-check-circle"></i> Sent (Instagram Attempted)</p>';
+                else if (bill.shareStatus.manuallyShared) shareStatusHtml = '<p style="color: #ff9900; margin-top: 5px;"><i class="fas fa-handshake"></i> Manually Shared</p>';
+                else shareStatusHtml = '<p style="color: #6c757d; margin-top: 5px;"><i class="fas fa-info-circle"></i> Not Shared Yet</p>';
+            }
+
+            // Dynamically create voucher dropdown content
+            let voucherDropdownContent = voucherDefinitions.map(v => {
+                return `
+                    <a href="#" onclick="event.preventDefault(); sendVoucherWithDiscount('${billDocId}', ${v.serialNumber});">
+                        ${v.description} (WA)
+                    </a>
+                    <a href="#" onclick="event.preventDefault(); prepareVoucherForInstagramShare('${billDocId}', ${v.serialNumber});">
+                        ${v.description} (IG)
+                    </a>
+                `;
+            }).join('');
+
+
+            let actionsHtml = '';
+            // Use the check to determine which buttons to show
+            if (isAdminOnAdminPage) {
+                actionsHtml = `
+                    <button class="btn" onclick="viewBillDetails('${billDocId}')"><i class="fas fa-eye"></i> View</button>
+                    <button class="btn btn-green" onclick="openAssignVoucherModal('${billDocId}')"><i class="fas fa-gift"></i> Assign Voucher</button>
+                    <button class="btn whatsapp" onclick="sendWhatsAppBill('${billDocId}')"><i class="fab fa-whatsapp"></i> WhatsApp</button>
+                    <button class="btn instagram" onclick="prepareInstagramShare('${billDocId}')"><i class="fab fa-instagram"></i> Instagram</button>
+                    <button class="btn manual-share" onclick="markBillAsManuallySharedFromList('${billDocId}')"><i class="fas fa-handshake"></i> Manual</button>
+                    <div class="dropdown">
+                        <button class="btn voucher"><i class="fas fa-ticket-alt"></i> Send Voucher</button>
+                        <div class="dropdown-content">${voucherDropdownContent}</div>
+                    </div>
+                    <button class="btn delete-bill" onclick="confirmDeleteBill('${billDocId}')"><i class="fas fa-trash"></i> Delete</button>
+                `;
+            } else { 
+                actionsHtml = `
+                    <button class="btn" onclick="viewBillDetails('${billDocId}')"><i class="fas fa-eye"></i> View</button>
+                    <button class="btn btn-green" onclick="openAssignVoucherModal('${billDocId}')"><i class="fas fa-gift"></i> Assign Voucher</button>
+                    <button class="btn whatsapp" onclick="sendWhatsAppBill('${billDocId}')"><i class="fab fa-whatsapp"></i> WhatsApp</button>
+                    <button class="btn instagram" onclick="prepareInstagramShare('${billDocId}')"><i class="fab fa-instagram"></i> Instagram</button>
+                `;
+            }
+
+            const createdByHtml = bill.createdByName ? `<p><strong>Staff:</strong> ${bill.createdByName}</p>` : '';
+            
+            let assignedVoucherDisplay = '';
+            if (bill.assignedVoucher) {
+                assignedVoucherDisplay = `<p><strong>Voucher:</strong> ${bill.assignedVoucher.description}</p>`;
+            } else {
+                assignedVoucherDisplay = `<p style="margin-top: 15px; color: #6c757d;">No voucher for this bill.</p>`;
+            }
+
+            div.innerHTML = `
+                ${imageHtml}
+                <div class="bill-item-content">
+                    <h4>🎮 GAME ZONE | MISSION COMPLETE!</h4>
+                    <p><strong>Serial:</strong> ${bill.serialNumber || 'N/A'}</p>
+                    <p><strong>🧾 Bill Code:</strong> ${bill.publicCode || 'N/A'}</p>
+                    <p><strong>👤 Player:</strong> ${bill.customerName}</p>
+                    <p><strong>📞 ${bill.customerContactInfo || 'N/A'}</strong></p>
+                    <p><strong>🎟️ ${bill.numberOfPeople} Player${bill.numberOfPeople > 1 ? 's' : ''} | ${durationString} of Fun</strong></p>
+                    <p><strong>💰 Paid:</strong> ₹${(bill.amount || 0).toFixed(2)}</p>
+                    <p><strong>📝 Remarks:</strong> ${bill.remarks || 'None'}</p>
+                    ${createdByHtml}
+                    ${shareStatusHtml}
+                    <div class="bill-voucher-section" style="margin-top: 15px;">
+                        ${assignedVoucherDisplay}
+                    </div>
+                    <div class="bill-actions">
+                        ${actionsHtml}
+                    </div>
+                </div>
+            `;
+            return div;
+        }
+        
+        async function markBillAsManuallySharedFromList(billDocId) {
+            currentBillId = billDocId; 
+            await markBillAsManuallyShared(); 
+        }
+
+        async function viewBillDetails(billDocId) {
+            try {
+                const billDoc = await db.collection('bills').doc(billDocId).get();
+                if (billDoc.exists) {
+                    const bill = billDoc.data();
+                    currentBillId = billDocId; 
+                    currentBillData = bill;
+                    const timeInDate = new Date(bill.timeIn);
+                    const timeOutDate = new Date(bill.timeOut);
+                    const createdByInfo = bill.createdByName || 'Unknown'; 
+                    const durationMs = timeOutDate.getTime() - timeInDate.getTime();
+                    const totalMinutes = Math.floor(durationMs / (1000 * 60));
+                    let durationString = `${Math.floor(totalMinutes / 60)} Hours ${totalMinutes % 60} Minutes`;
+
+                    let voucherDetailsHtml = '';
+                    if (bill.assignedVoucher && bill.assignedVoucher.description) {
+                         voucherDetailsHtml = `<p>🎁 <strong>Voucher:</strong> ${bill.assignedVoucher.description}</p>
+                                               <p>Click image to view:</p>
+                                               <a href="${bill.assignedVoucher.imageUrl}" target="_blank">
+                                                 <img src="${bill.assignedVoucher.imageUrl}" style="max-width: 100%; border-radius: 10px; margin-top: 10px; cursor: pointer;" onerror="this.style.display='none'">
+                                               </a>`;
+                    } else {
+                        voucherDetailsHtml = `<p style="margin-top: 15px; color: #6c757d;">No voucher for this bill.</p>`;
+                    }
+
+                    document.getElementById('billDetailsTitle').textContent = `Bill for ${bill.customerName} (Serial: ${bill.serialNumber || 'N/A'})`;
+                    document.getElementById('billDetailsContent').innerHTML = `
+                        <p><strong>🧾 Bill Code:</strong> ${bill.publicCode || 'N/A'}</p>
+                        <p><strong>👤 Player:</strong> ${bill.customerName}</p>
+                        <p><strong>📞 Contact:</strong> ${bill.customerContactInfo || 'N/A'}</p>
+                        <p><strong>🎟️ People:</strong> ${bill.numberOfPeople} | <strong>${durationString} of Fun</strong></p>
+                        <p><strong>💰 Paid:</strong> ₹${(bill.amount || 0).toFixed(2)}</p>
+                        <p><strong>📝 Remarks:</strong> ${bill.remarks || 'None'}</p>
+                        <p><strong>🧑‍💼 Created By:</strong> ${createdByInfo}</p>
+                        <p><strong>📅 Created At:</strong> ${bill.createdAt?.toDate().toLocaleString() || 'N/A'}</p>
+                        ${voucherDetailsHtml}
+                    `;
+                    
+                    const billDetailsActions = document.getElementById('billDetailsActions');
+                    let voucherDropdownContent = voucherDefinitions.map(v => `
+                        <a href="#" onclick="event.preventDefault(); sendVoucherWithDiscount(currentBillId, ${v.serialNumber});">${v.description} (WA)</a>
+                        <a href="#" onclick="event.preventDefault(); prepareVoucherForInstagramShare(currentBillId, ${v.serialNumber});">${v.description} (IG)</a>
+                    `).join('');
+
+                    const isAdminOnAdminPage = currentUserRole === 'admin' && document.getElementById('adminPage').classList.contains('active');
+
+                    if (isAdminOnAdminPage) {
+                        billDetailsActions.innerHTML = `
+                            <button class="btn whatsapp" onclick="sendBillViaWhatsAppFromModal()"><i class="fab fa-whatsapp"></i> Send Bill (WA)</button>
+                            <button class="btn instagram" onclick="prepareInstagramShare(currentBillId)"><i class="fab fa-instagram"></i> Send Bill (IG)</button>
+                            <button class="btn manual-share" onclick="markBillAsManuallyShared()"><i class="fas fa-handshake"></i> Manual</button>
+                             <button class="btn btn-green" onclick="openAssignVoucherModal(currentBillId); closeModal('billDetailsModal');"><i class="fas fa-gift"></i> Assign Voucher</button>
+                            <div class="dropdown">
+                                <button class="btn voucher"><i class="fas fa-ticket-alt"></i> Send Voucher</button>
+                                <div class="dropdown-content">${voucherDropdownContent}</div>
+                            </div>
+                            <button class="btn delete-bill" onclick="confirmDeleteBill(currentBillId)">🗑️ Delete Bill</button>
+                        `;
+                    } else {
+                        billDetailsActions.innerHTML = `
+                            <button class="btn whatsapp" onclick="sendBillViaWhatsAppFromModal()"><i class="fab fa-whatsapp"></i> Send Bill (WA)</button>
+                            <button class="btn instagram" onclick="prepareInstagramShare(currentBillId)"><i class="fab fa-instagram"></i> Send Bill (IG)</button>
+                            <button class="btn manual-share" onclick="markBillAsManuallyShared()"><i class="fas fa-handshake"></i> Manual</button>
+                            <button class="btn btn-green" onclick="openAssignVoucherModal(currentBillId); closeModal('billDetailsModal');"><i class="fas fa-gift"></i> Assign Voucher</button>
+                        `;
+                    }
+
+                    openModal('billDetailsModal');
+                    document.getElementById('billDetailsMessage').style.display = 'none'; 
+                }
+            } catch (error) {
+                showErrorInModal('billDetailsMessage', 'Error loading bill details.');
+                console.error("Error in viewBillDetails:", error);
+            }
+        }
+
+        function sendBillViaWhatsAppFromModal() {
+            if (currentBillId) sendWhatsAppBill(currentBillId);
+            else showErrorInModal('billDetailsMessage', 'No bill selected.');
+        }
+        
+        // --- Logout ---
+        function logout() {
+            stopCycle(false); // Stop the cycle without saving state, as we're logging out
+            auth.signOut().catch(error => console.error("Logout error:", error));
+        }
+
+        // --- Initialization ---
+        function initializeTimeInputs() {
+            const now = new Date();
+            const timeIn = document.getElementById('timeIn');
+            const timeOut = document.getElementById('timeOut');
+            const pad = (num) => String(num).padStart(2, '0');
+            const localDateTime = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+            if (timeIn) timeIn.value = localDateTime;
+            if (timeOut) {
+                const oneHourLater = new Date(now.getTime() + 60 * 60 * 1000);
+                timeOut.value = `${oneHourLater.getFullYear()}-${pad(oneHourLater.getMonth() + 1)}-${pad(oneHourLater.getDate())}T${pad(oneHourLater.getHours())}:${pad(oneHourLater.getMinutes())}`;
+            }
+        }
+
+        function openModal(modalId) { document.getElementById(modalId).style.display = 'flex'; }
+        function closeModal(modalId) { 
+            const modal = document.getElementById(modalId);
+            if(modal) modal.style.display = 'none'; 
+
+            if (modalId === 'voucherManagementModal') {
+                resetVoucherForm();
+            }
+        }
+
+
+        window.onclick = (event) => {
+            if (event.target.classList.contains('modal')) {
+                closeModal(event.target.id);
+            }
+        }
+
+        // --- Voucher Cycle Logic ---
+
+        function updateTimerDisplay(seconds, status) {
+            const timerDisplay = document.getElementById('timerDisplay');
+            const cycleStatusEl = document.getElementById('cycleStatus');
+            
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            timerDisplay.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+            
+            cycleStatusEl.classList.remove('active', 'break');
+            if (status === 'active') {
+                cycleStatusEl.textContent = 'Active - Sending Vouchers';
+                cycleStatusEl.classList.add('active');
+            } else if (status === 'break') {
+                cycleStatusEl.textContent = 'Break - Paused';
+                cycleStatusEl.classList.add('break');
+            } else {
+                cycleStatusEl.textContent = 'Stopped';
+            }
+        }
+
+        async function startCycle() {
+            clearInterval(cycleInterval); // Clear any existing interval
+
+            const activeDuration = parseInt(document.getElementById('activeDuration').value, 10);
+            const breakDuration = parseInt(document.getElementById('breakDuration').value, 10);
+
+            if (isNaN(activeDuration) || isNaN(breakDuration) || activeDuration <= 0 || breakDuration <= 0) {
+                showError('adminPanelMessage', 'Please enter valid positive numbers for durations.');
+                return;
+            }
+
+            const cycleSettings = {
+                cycleState: 'active',
+                activeDuration: activeDuration * 60, // store in seconds
+                breakDuration: breakDuration * 60, // store in seconds
+                stateChangeTimestamp: firebase.firestore.FieldValue.serverTimestamp()
+            };
+
+            await db.collection('appSettings').doc('global').set(cycleSettings, { merge: true });
+            await setVoucherToggleState(true, false); // Start with vouchers ON, no message
+            
+            runCycle(cycleSettings.activeDuration, 'active');
+            showSuccess('adminPanelMessage', 'Voucher cycle started!');
+        }
+        
+        function runCycle(initialTime, initialState) {
+            clearInterval(cycleInterval); // Ensure no multiple intervals running
+            let timeRemaining = initialTime;
+            let currentState = initialState;
+
+            // Immediately update UI
+            updateTimerDisplay(timeRemaining, currentState);
+            document.getElementById('voucherToggle').checked = (currentState === 'active');
+            document.getElementById('voucherToggle').disabled = true;
+
+            cycleInterval = setInterval(async () => {
+                timeRemaining--;
+                updateTimerDisplay(timeRemaining, currentState);
+
+                if (timeRemaining <= 0) {
+                    if (currentState === 'active') {
+                        currentState = 'break';
+                        timeRemaining = parseInt(document.getElementById('breakDuration').value, 10) * 60;
+                        await setVoucherToggleState(false, false);
+                    } else {
+                        currentState = 'active';
+                        timeRemaining = parseInt(document.getElementById('activeDuration').value, 10) * 60;
+                        await setVoucherToggleState(true, false);
+                    }
+                    
+                    const newCycleState = {
+                        cycleState: currentState,
+                        stateChangeTimestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    };
+                    await db.collection('appSettings').doc('global').set(newCycleState, { merge: true });
+
+                    updateTimerDisplay(timeRemaining, currentState);
+                    document.getElementById('voucherToggle').checked = (currentState === 'active');
+                }
+            }, 1000);
+        }
+
+        async function stopCycle(saveState = true) {
+            clearInterval(cycleInterval);
+            cycleInterval = null;
+            updateTimerDisplay(0, 'stopped');
+            document.getElementById('voucherToggle').disabled = false;
+
+            if(saveState) {
+                await db.collection('appSettings').doc('global').set({ cycleState: 'stopped' }, { merge: true });
+                await setVoucherToggleState(false); 
+                showSuccess('adminPanelMessage', 'Voucher cycle stopped.'); // Corrected message for stop cycle
+            }
+        }
+
+        async function initializeAdminPanel() {
+            // Setup voucher management
+            await seedInitialVouchers();
+            loadVouchersFromFirestore();
+            await loadVoucherSequence(); // Load voucher sequence
+
+            const voucherToggle = document.getElementById('voucherToggle');
+            const startBtn = document.getElementById('startCycleBtn');
+            const stopBtn = document.getElementById('stopCycleBtn');
+            
+            // Re-bind listeners
+            voucherToggle.removeEventListener('change', onVoucherToggleChange);
+            const newStartBtn = startBtn.cloneNode(true);
+            startBtn.parentNode.replaceChild(newStartBtn, startBtn);
+            const newStopBtn = stopBtn.cloneNode(true);
+            stopBtn.parentNode.replaceChild(newStopBtn, stopBtn);
+
+            voucherToggle.addEventListener('change', onVoucherToggleChange);
+            newStartBtn.addEventListener('click', startCycle);
+            newStopBtn.addEventListener('click', () => stopCycle(true));
+            
+            // Fetch and apply settings from Firestore
+            try {
+                const docRef = db.collection('appSettings').doc('global');
+                const docSnap = await docRef.get();
+                if (docSnap.exists) {
+                    const settings = docSnap.data();
+                    
+                    voucherToggle.checked = settings.voucherGenerationEnabled || false;
+                    document.getElementById('activeDuration').value = (settings.activeDuration || 1200) / 60;
+                    document.getElementById('breakDuration').value = (settings.breakDuration || 1200) / 60;
+
+                    if (settings.cycleState && settings.cycleState !== 'stopped' && settings.stateChangeTimestamp) {
+                        const stateChangedAt = settings.stateChangeTimestamp.toDate().getTime();
+                        const now = Date.now();
+                        const elapsedSeconds = Math.floor((now - stateChangedAt) / 1000);
+
+                        let durationForCurrentState = (settings.cycleState === 'active') ? settings.activeDuration : settings.breakDuration;
+
+                        if (elapsedSeconds < durationForCurrentState) {
+                            const timeRemaining = durationForCurrentState - elapsedSeconds;
+                            runCycle(timeRemaining, settings.cycleState);
+                            showSuccess('adminPanelMessage', 'Resumed active voucher cycle.');
+                        } else {
+                            stopCycle(true);
+                        }
+                    } else {
+                        stopCycle(false);
+                    }
+                }
+            } catch (error) {
+                console.error("Error initializing admin panel:", error);
+                showError('adminPanelMessage', 'Could not load admin settings.');
+                stopCycle(false);
+            }
+
+            loadAdminBillHistory();
+        }
+
+        async function onVoucherToggleChange(e) {
+            if (!cycleInterval) {
+                await setVoucherToggleState(e.target.checked);
+            }
+        }
+
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                currentUser = user;
+                const userDoc = await db.collection('users').doc(currentUser.uid).get();
+                if (userDoc.exists) {
+                    const userData = userDoc.data();
+                    currentUserRole = userData.role || 'staff';
+                    if (!currentUser.displayName && userData.name) {
+                        try {
+                           await currentUser.updateProfile({ displayName: userData.name });
+                        } catch(e) { console.warn("Could not update profile display name:", e); }
+                    }
+                    document.getElementById('userName').textContent = userData.name || currentUser.email;
+                } else { 
+                    currentUserRole = 'staff';
+                    document.getElementById('userName').textContent = currentUser.displayName || currentUser.email;
+                     await db.collection('users').doc(currentUser.uid).set({
+                        name: currentUser.displayName || currentUser.email.split('@')[0],
+                        email: currentUser.email,
+                        role: 'staff', 
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    }, { merge: true }); 
+                }
+                initializeTimeInputs();
+                showPage('dashboard');
+                loadStats();
+                loadBillHistory(); 
+                if (currentUserRole === 'admin') {
+                    initializeAdminPanel();
+                }
+            } else {
+                currentUser = null;
+                currentUserRole = 'staff';
+                showPage('landing');
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeTimeInputs(); 
+        });
+    </script>
+</body>
+</html>
